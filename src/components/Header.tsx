@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import './header.css';
-import { getUser, logout, type User } from '../store/auth';
+import { getUser, logout, type User } from '../store/appAuth';
 
 interface HeaderProps {
   activePage?: string;
@@ -39,7 +39,7 @@ export default function Header({ activePage }: HeaderProps) {
           <li><a href="/#services" className={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
-          <li><a href="/#settings" className={activePage === 'settings' ? 'active' : ''}>SETTINGS</a></li>
+          <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>FREELANCERS</a></li>
         </ul>
 
         {user ? (
@@ -54,6 +54,7 @@ export default function Header({ activePage }: HeaderProps) {
             {dropdownOpen && (
               <div className="header-dropdown">
                 <a href="/mypage" className="header-dropdown-item">마이페이지</a>
+                <a href="/project" className="header-dropdown-item">내 프로젝트</a>
                 <button className="header-dropdown-item danger" onClick={handleLogout}>로그아웃</button>
               </div>
             )}

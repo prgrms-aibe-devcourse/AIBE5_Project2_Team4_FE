@@ -1,6 +1,6 @@
 <script lang="ts">
   import './main.css';
-  import Header from '../components/Header.svelte';
+  import AppHeader from '../components/AppHeader.svelte';
 
   let video: HTMLVideoElement;
   let rafId: number;
@@ -17,7 +17,7 @@
 <svelte:window onmousemove={handleMouseMove} />
 
 <div class="main-page">
-  <Header activePage="home" />
+  <AppHeader activePage="home" />
 
   <section class="hero-section" id="home">
     <div class="hero-content">

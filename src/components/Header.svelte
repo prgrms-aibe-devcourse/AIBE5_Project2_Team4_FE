@@ -39,7 +39,7 @@
       <li><a href="/#services" class={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
       <li><a href="/#about" class={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
       <li><a href="/#contact" class={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
-      <li><a href="/#settings" class={activePage === 'settings' ? 'active' : ''}>SETTINGS</a></li>
+      <li><a href="/freelancers" class={activePage === 'freelancers' ? 'active' : ''}>FREELANCERS</a></li>
     </ul>
 
     {#if user}
@@ -55,6 +55,7 @@
         {#if dropdownOpen}
           <div class="header-dropdown">
             <a href="/mypage" class="header-dropdown-item">마이페이지</a>
+            <a href="/project" class="header-dropdown-item">내 프로젝트</a>
             <button class="header-dropdown-item danger" onclick={handleLogout}>로그아웃</button>
           </div>
         {/if}

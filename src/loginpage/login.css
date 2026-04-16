@@ -152,8 +152,69 @@ body {
   margin-bottom: 0.25rem;
 }
 
-.login-test-hint span {
+.login-error {
   font-size: 0.85rem;
+  color: #e07070;
+  text-align: center;
+  margin-top: -0.25rem;
+}
+
+.test-account-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+  background: none;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 0.6rem 0.75rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background-color 0.2s ease;
+  font-family: inherit;
+  text-align: left;
+  margin-top: 0.25rem;
+}
+
+.test-account-btn:hover {
+  border-color: #555;
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.test-role-badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.2rem 0.5rem;
+  border-radius: 20px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.test-role-badge--user {
+  background-color: rgba(155, 168, 130, 0.15);
+  color: var(--green-accent);
+  border: 1px solid rgba(155, 168, 130, 0.4);
+}
+
+.test-role-badge--freelancer {
+  background-color: rgba(100, 160, 220, 0.15);
+  color: #6aaed6;
+  border: 1px solid rgba(100, 160, 220, 0.4);
+}
+
+.test-role-badge--admin {
+  background-color: rgba(220, 100, 100, 0.15);
+  color: #e07070;
+  border: 1px solid rgba(220, 100, 100, 0.4);
+}
+
+.test-account-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.test-account-info span {
+  font-size: 0.8rem;
   color: var(--text-secondary);
   font-family: monospace;
 }
