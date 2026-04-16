@@ -148,29 +148,16 @@ body {
 }
 
 /* 타일 모드 카드 */
-.fl-card--grid {
-  flex-direction: column;
-}
-
-.fl-card--grid .fl-card-top {
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.75rem;
-}
-
-.fl-card--grid .fl-rating {
-  margin-left: auto;
-  margin-top: -2.5rem;
-}
-
 .fl-card {
   background-color: var(--light-dark);
   border-radius: 14px;
   padding: 1.4rem;
   cursor: pointer;
-  display: flex;
-  flex-direction: column;
-  gap: 0.875rem;
+  display: grid;
+  grid-template-columns: 180px minmax(0, 1fr) auto;
+  grid-template-rows: auto auto auto;
+  column-gap: 1.1rem;
+  row-gap: 0.875rem;
   border: 1px solid transparent;
   transition: border-color 0.2s ease, transform 0.15s ease;
 }
@@ -181,21 +168,22 @@ body {
 }
 
 .fl-card-top {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
+  display: contents;
 }
 
 .fl-avatar {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 180px;
+  min-width: 180px;
+  height: 220px;
+  border-radius: 16px;
   background-color: var(--green-accent);
   color: var(--dark-bg);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.2rem;
+  font-size: 2.4rem;
   font-weight: 700;
   flex-shrink: 0;
   overflow: hidden;
@@ -206,10 +194,18 @@ body {
   height: 100%;
   object-fit: cover;
   object-position: top center;
-  border-radius: 50%;
+  border-radius: inherit;
 }
 
-.fl-card-info { flex: 1; display: flex; flex-direction: column; gap: 0.4rem; }
+.fl-card-info {
+  grid-column: 2;
+  grid-row: 1;
+  align-self: start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 0;
+}
 
 .fl-name-row { display: flex; align-items: center; gap: 0.5rem; }
 
@@ -237,16 +233,21 @@ body {
 }
 
 .fl-rating {
+  grid-column: 3;
+  grid-row: 1;
   display: flex;
   align-items: center;
   gap: 0.2rem;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .fl-star { color: #f0c040; font-size: 1rem; }
 .fl-rating-num { font-size: 0.95rem; font-weight: 600; }
 
 .fl-bio {
+  grid-column: 2 / 4;
+  grid-row: 2;
   font-size: 0.88rem;
   color: var(--text-secondary);
   line-height: 1.6;
@@ -257,7 +258,10 @@ body {
 }
 
 .fl-stats {
+  grid-column: 2 / 4;
+  grid-row: 3;
   display: flex;
+  flex-wrap: wrap;
   gap: 1rem;
   font-size: 0.8rem;
   color: var(--text-secondary);
@@ -551,4 +555,41 @@ body {
 
 @media (max-width: 768px) {
   .fl-filter-bar { flex-direction: column; align-items: flex-start; }
+
+  .fl-card {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .fl-avatar {
+    grid-column: 1;
+    grid-row: auto;
+    width: 100%;
+    min-width: 0;
+    height: 200px;
+  }
+
+  .fl-card-info,
+  .fl-rating,
+  .fl-bio,
+  .fl-stats {
+    grid-column: 1;
+  }
+
+  .fl-card-info,
+  .fl-rating,
+  .fl-bio,
+  .fl-stats {
+    grid-row: auto;
+  }
+}
+
+.fl-card--grid {
+  grid-template-columns: 140px minmax(0, 1fr) auto;
+}
+
+.fl-card--grid .fl-avatar {
+  width: 140px;
+  min-width: 140px;
+  height: 180px;
 }
