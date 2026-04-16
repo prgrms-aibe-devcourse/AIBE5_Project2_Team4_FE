@@ -1,0 +1,622 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --dark-bg: #1a1a1a;
+  --light-dark: #2a2a2a;
+  --green-accent: #9ba882;
+  --green-dark: #7a8a62;
+  --text-light: #ffffff;
+  --text-secondary: #b0b0b0;
+}
+
+body {
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--dark-bg);
+  color: var(--text-light);
+}
+
+/* Layout */
+.project-page { min-height: 100vh; }
+
+.project-content {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 3rem 2rem;
+}
+
+/* Page header */
+.project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 2rem;
+}
+
+.project-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.project-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.btn-create {
+  background-color: var(--green-accent);
+  color: var(--dark-bg);
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-create:hover { background-color: var(--green-dark); }
+
+/* Filter */
+.filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.75rem;
+}
+
+.filter-chip {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.filter-chip:hover { border-color: #555; color: var(--text-light); }
+
+.filter-chip.active {
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.1);
+}
+
+.filter-count {
+  font-size: 0.75rem;
+  background: rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 0.05rem 0.4rem;
+}
+
+/* Project list */
+.project-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.project-card {
+  background-color: var(--light-dark);
+  border-radius: 14px;
+  padding: 1.4rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, transform 0.15s ease;
+}
+
+.project-card:hover {
+  border-color: rgba(155, 168, 130, 0.3);
+  transform: translateY(-2px);
+}
+
+.project-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-type-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  background: rgba(155, 168, 130, 0.12);
+  color: var(--green-accent);
+  border: 1px solid rgba(155, 168, 130, 0.25);
+}
+
+/* FR-PROJECT-07: 상태 배지 */
+.project-status {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+}
+
+.status--request  { background: rgba(212,168,75,0.15);  color: #d4a84b; border: 1px solid rgba(212,168,75,0.3); }
+.status--accept   { background: rgba(100,174,214,0.15); color: #6aaed6; border: 1px solid rgba(100,174,214,0.3); }
+.status--progress { background: rgba(155,168,130,0.15); color: var(--green-accent); border: 1px solid rgba(155,168,130,0.3); }
+.status--done     { background: rgba(176,176,176,0.1);  color: var(--text-secondary); border: 1px solid #3a3a3a; }
+
+.project-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.project-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.project-card-freelancer {
+  font-size: 0.8rem;
+  color: var(--green-accent);
+  padding-top: 0.25rem;
+  border-top: 1px solid #333;
+}
+
+.project-empty {
+  text-align: center;
+  padding: 4rem 0;
+  color: var(--text-secondary);
+  font-size: 0.95rem;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.modal {
+  background-color: var(--light-dark);
+  border-radius: 20px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 540px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  transition: color 0.2s;
+}
+
+.modal-close:hover { color: var(--text-light); }
+
+.modal-head { display: flex; flex-direction: column; gap: 0.5rem; }
+
+.modal-badges { display: flex; gap: 0.5rem; align-items: center; }
+
+.modal-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding-right: 2rem;
+}
+
+/* FR-PROJECT-05: 상세 정보 */
+.modal-info {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+
+.modal-info li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #333;
+}
+
+.modal-info li:last-child { border-bottom: none; }
+
+.modal-info li span:first-child { color: var(--text-secondary); }
+
+.modal-desc-label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-bottom: 0.4rem;
+}
+
+.modal-desc-text {
+  font-size: 0.9rem;
+  line-height: 1.7;
+  color: var(--text-light);
+}
+
+/* FR-PROJECT-06: 진행 상태 트래커 */
+.progress-track {
+  display: flex;
+  align-items: flex-start;
+  gap: 0;
+}
+
+.progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+
+.progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  border: 2px solid #3a3a3a;
+  z-index: 1;
+  transition: all 0.3s;
+}
+
+.progress-dot.reached {
+  background: var(--green-accent);
+  border-color: var(--green-accent);
+}
+
+.progress-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 0.4rem;
+  text-align: center;
+}
+
+.progress-label.current {
+  color: var(--green-accent);
+  font-weight: 600;
+}
+
+.progress-line {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: #3a3a3a;
+}
+
+.progress-line.reached { background: var(--green-accent); }
+
+/* FR-PROJECT-08: 액션 버튼 */
+.modal-actions { display: flex; gap: 0.75rem; }
+
+.btn-action {
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-action:hover { opacity: 0.85; }
+
+.btn-review        { background-color: var(--green-accent); color: var(--dark-bg); }
+.btn-cancel        { background-color: transparent; border: 1px solid #e07070; color: #e07070; }
+.btn-edit-project  { background-color: transparent; border: 1px solid #6aaed6; color: #6aaed6; }
+
+/* Create form */
+.create-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.form-group label {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.form-group input,
+.form-group textarea {
+  background-color: var(--dark-bg);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  resize: vertical;
+}
+
+.form-group input:focus,
+.form-group textarea:focus { border-color: var(--green-accent); }
+
+.form-group input::placeholder,
+.form-group textarea::placeholder { color: #555; }
+
+/* FR-PROJECT-03: 유형 선택 */
+.type-selector { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+.type-btn {
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.4rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.type-btn:hover { border-color: var(--green-accent); color: var(--green-accent); }
+
+.type-btn.selected {
+  background: rgba(155, 168, 130, 0.15);
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+  font-weight: 600;
+}
+
+.form-submit { align-self: flex-end; }
+
+/* Color scheme for date/time inputs */
+input[type="date"]::-webkit-calendar-picker-indicator,
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.6);
+  cursor: pointer;
+}
+
+@media (max-width: 768px) {
+  .project-list { grid-template-columns: 1fr; }
+  .form-row { grid-template-columns: 1fr; }
+  .project-header { flex-direction: column; gap: 1rem; }
+  .btn-create { width: 100%; text-align: center; }
+}
+
+.review-modal {
+  max-width: 620px;
+}
+
+.review-rating-row {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.review-rating-btn {
+  border: 1px solid #3a3a3a;
+  border-radius: 20px;
+  background: transparent;
+  color: var(--text-secondary);
+  padding: 0.45rem 0.9rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.review-rating-btn.selected,
+.review-rating-btn:hover {
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.12);
+}
+
+.review-helper-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+/* 페이지 탭 바 */
+.page-tab-bar {
+  display: flex;
+  gap: 0;
+  border-bottom: 1px solid #333;
+  margin-bottom: 1.75rem;
+}
+
+.page-tab {
+  position: relative;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.75rem 1.25rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  transition: color 0.2s ease;
+}
+
+.page-tab::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--green-accent);
+  border-radius: 2px 2px 0 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.page-tab:hover { color: var(--text-light); }
+
+.page-tab.active {
+  color: var(--green-accent);
+  font-weight: 600;
+}
+
+.page-tab.active::after { opacity: 1; }
+
+.page-tab-badge {
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(240, 90, 90, 0.85);
+  color: #fff;
+  font-size: 0.68rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 5px;
+}
+
+/* 제안 목록 */
+.proposal-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.proposal-card {
+  background-color: var(--light-dark);
+  border-radius: 14px;
+  padding: 1.25rem 1.4rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease;
+}
+
+.proposal-card:hover {
+  border-color: rgba(155, 168, 130, 0.25);
+}
+
+.proposal-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.proposal-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.proposal-card-date {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.proposal-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.proposal-card-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 1.25rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.proposal-card-desc {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  line-height: 1.6;
+  padding-top: 0.25rem;
+  border-top: 1px solid #333;
+  white-space: pre-line;
+}
+
+.proposal-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  padding-top: 0.25rem;
+}
+
+.proposal-btn {
+  border-radius: 8px;
+  padding: 0.5rem 1.1rem;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.proposal-btn:hover { opacity: 0.82; }
+
+.proposal-btn--accept {
+  background-color: var(--green-accent);
+  color: var(--dark-bg);
+  border: none;
+}
+
+.proposal-btn--reject {
+  background-color: transparent;
+  border: 1px solid #e07070;
+  color: #e07070;
+}
+
+.proposal-status-text {
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+}

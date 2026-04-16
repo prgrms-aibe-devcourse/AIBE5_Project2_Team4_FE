@@ -1,0 +1,132 @@
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --dark-bg: #1a1a1a;
+  --light-dark: #2a2a2a;
+  --green-accent: #9ba882;
+  --text-light: #ffffff;
+  --text-secondary: #b0b0b0;
+
+  --color-400: #d4a84b;
+  --color-401: #9ba882;
+  --color-403: #6aaed6;
+  --color-404: #b0b0b0;
+  --color-500: #e07070;
+}
+
+body {
+  font-family: Pretendard, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background-color: var(--dark-bg);
+  color: var(--text-light);
+}
+
+.error-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  position: relative;
+}
+
+.error-theme-toggle {
+  position: fixed;
+  top: 1.5rem;
+  right: 1.5rem;
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  border: 1px solid var(--line-soft);
+  background: var(--light-dark);
+  color: var(--text-light);
+  font-size: 1rem;
+  cursor: pointer;
+  box-shadow: var(--panel-shadow);
+}
+
+.error-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  max-width: 480px;
+  width: 100%;
+  gap: 1rem;
+}
+
+/* Symbol */
+.error-symbol {
+  font-size: 3.5rem;
+  line-height: 1;
+  margin-bottom: 0.5rem;
+  opacity: 0.9;
+}
+
+.error-symbol--400 { color: var(--color-400); }
+.error-symbol--401 { color: var(--color-401); }
+.error-symbol--403 { color: var(--color-403); }
+.error-symbol--404 { color: var(--color-404); }
+.error-symbol--500 { color: var(--color-500); }
+
+/* Error code */
+.error-code {
+  font-size: 7rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -4px;
+  opacity: 0.15;
+  margin-top: -1.5rem;
+  margin-bottom: -0.5rem;
+  user-select: none;
+}
+
+.error-code--400 { color: var(--color-400); }
+.error-code--401 { color: var(--color-401); }
+.error-code--403 { color: var(--color-403); }
+.error-code--404 { color: var(--color-404); }
+.error-code--500 { color: var(--color-500); }
+
+/* Title */
+.error-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-light);
+}
+
+/* Description */
+.error-description {
+  font-size: 0.95rem;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+/* Button */
+.error-btn {
+  display: inline-block;
+  margin-top: 1rem;
+  padding: 0.8rem 2rem;
+  border-radius: 10px;
+  border: none;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.error-btn:hover {
+  opacity: 0.85;
+}
+
+.error-btn--400 { background-color: var(--color-400); color: var(--dark-bg); }
+.error-btn--401 { background-color: var(--color-401); color: var(--dark-bg); }
+.error-btn--403 { background-color: var(--color-403); color: var(--dark-bg); }
+.error-btn--404 { background-color: var(--light-dark); color: var(--text-light); border: 1px solid #444; }
+.error-btn--500 { background-color: var(--color-500); color: var(--text-light); }

@@ -8,11 +8,7 @@ export default defineConfig({
   plugins: [
     react(),
     babel({ presets: [reactCompilerPreset()] }),
-    svelte({
-      compilerOptions: {
-        customElement: true
-      }
-    })
+    svelte()
   ],
 })
 
