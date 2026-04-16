@@ -57,6 +57,11 @@ export function canCancelProject(user: User | null, project: Project): boolean {
   return user.role === 'ROLE_USER' && project.requesterEmail === user.email && project.status === 'REQUESTED';
 }
 
+export function canEditProject(user: User | null, project: Project): boolean {
+  if (!user) return false;
+  return user.role === 'ROLE_USER' && project.requesterEmail === user.email && project.status === 'REQUESTED';
+}
+
 export function canWriteReview(user: User | null, project: Project): boolean {
   if (!user) {
     return false;

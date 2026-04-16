@@ -647,6 +647,23 @@ body {
   height: 180px;
 }
 
+:root[data-theme='light'] .fl-card::before {
+  background:
+    radial-gradient(circle at var(--card-pointer-x) var(--card-pointer-y), rgba(0, 0, 0, 0.06), rgba(0, 0, 0, 0.02) 12%, transparent 30%),
+    linear-gradient(120deg, rgba(93, 212, 255, 0.22) 10%, rgba(255, 111, 184, 0.2) 30%, rgba(180, 220, 255, 0.28) 45%, rgba(120, 220, 160, 0.22) 58%, rgba(255, 200, 80, 0.18) 74%, rgba(93, 212, 255, 0.22) 100%);
+  mix-blend-mode: multiply;
+  opacity: calc(0.28 + (var(--card-glare-opacity) * 0.5));
+}
+
+:root[data-theme='light'] .fl-card::after {
+  background:
+    linear-gradient(145deg, transparent 20%, rgba(80, 120, 200, 0.12) 42%, transparent 48%),
+    repeating-linear-gradient(115deg, rgba(100, 140, 220, 0.1) 0 2px, transparent 2px 7px),
+    radial-gradient(circle at var(--card-pointer-x) var(--card-pointer-y), rgba(60, 100, 200, 0.12), transparent 35%);
+  mix-blend-mode: multiply;
+  opacity: calc(0.15 + (var(--card-glare-opacity) * 0.45));
+}
+
 @media (hover: none), (prefers-reduced-motion: reduce) {
   .fl-card {
     transform: none;

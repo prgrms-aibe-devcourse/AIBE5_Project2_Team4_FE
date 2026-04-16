@@ -201,3 +201,16 @@ export function cancelProject(projectId: number): void {
 export function getProjectById(projectId: number): Project | null {
   return getProjects().find((project) => project.id === projectId) ?? null;
 }
+
+export type EditableProjectFields = Pick<Project, 'title' | 'type' | 'date' | 'time' | 'location' | 'description'>;
+
+export function updateProject(projectId: number, fields: EditableProjectFields): Project | null {
+  let updated: Project | null = null;
+  const next = getProjects().map((project) => {
+    if (project.id !== projectId) return project;
+    updated = { ...project, ...fields };
+    return updated;
+  });
+  writeProjects(next);
+  return updated;
+}

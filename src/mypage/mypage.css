@@ -96,19 +96,213 @@ body {
   margin-bottom: 3rem;
 }
 
-.avatar {
-  width: 80px;
-  height: 80px;
+/* 프로필 아바타 (hover → 모달) */
+.avatar-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
   border-radius: 50%;
   background-color: var(--green-accent);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  flex-shrink: 0;
+  overflow: hidden;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+.avatar-initial {
+  font-size: 2.2rem;
   font-weight: 700;
   color: var(--dark-bg);
-  flex-shrink: 0;
+  line-height: 1;
 }
+
+.avatar-overlay {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.52);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  color: #fff;
+}
+
+.avatar-wrap:hover .avatar-overlay { opacity: 1; }
+
+.avatar-overlay svg {
+  width: 22px;
+  height: 22px;
+}
+
+.avatar-overlay span {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+/* 아바타 변경 모달 */
+.avatar-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 300;
+  padding: 1rem;
+}
+
+.avatar-modal {
+  background: var(--light-dark);
+  border-radius: 20px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.avatar-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.avatar-modal-head h2 {
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.avatar-modal-close {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  padding: 0;
+  transition: color 0.2s;
+}
+
+.avatar-modal-close:hover { color: var(--text-light); }
+
+.avatar-modal-preview {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background-color: var(--green-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  align-self: center;
+  border: 3px solid var(--line-color, #333);
+}
+
+.avatar-modal-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-modal-initial {
+  font-size: 3.5rem;
+  font-weight: 700;
+  color: var(--dark-bg);
+  line-height: 1;
+}
+
+.avatar-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.avatar-modal-upload {
+  border: 1px solid var(--green-accent);
+  color: var(--green-accent);
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.avatar-modal-upload:hover {
+  background-color: rgba(155, 168, 130, 0.1);
+}
+
+.avatar-modal-remove {
+  border: 1px solid #e07070;
+  color: #e07070;
+  background: transparent;
+  border-radius: 10px;
+  padding: 0.6rem 1.2rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.avatar-modal-remove:hover {
+  background-color: rgba(224, 112, 112, 0.1);
+}
+
+.avatar-modal-footer {
+  display: flex;
+  gap: 0.75rem;
+  border-top: 1px solid var(--line-color, #333);
+  padding-top: 1.25rem;
+}
+
+.avatar-modal-cancel {
+  flex: 1;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  color: var(--text-secondary);
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+}
+
+.avatar-modal-cancel:hover { border-color: #666; }
+
+.avatar-modal-save {
+  flex: 1;
+  background: var(--green-accent);
+  border: none;
+  color: var(--dark-bg);
+  border-radius: 10px;
+  padding: 0.75rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.avatar-modal-save:hover { background: var(--green-dark); }
 
 .username {
   font-size: 1.75rem;
@@ -162,6 +356,128 @@ body {
   grid-template-columns: 1fr;
   gap: 1.5rem;
 }
+
+/* 계정 정보 카드 */
+.account-card {
+  background-color: var(--light-dark);
+  border-radius: 16px;
+  padding: 1.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.account-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.account-card-head h2 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--green-accent);
+}
+
+.account-info-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.account-info-list li {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  font-size: 0.9rem;
+  padding: 0.875rem 0;
+  border-bottom: 1px solid var(--line-color, #333);
+  gap: 1rem;
+}
+
+.account-info-list li:last-child { border-bottom: none; }
+
+.account-info-list li span:first-child {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.account-bio-row span:last-child {
+  text-align: right;
+  line-height: 1.6;
+  color: var(--text-secondary);
+  font-size: 0.88rem;
+  white-space: pre-wrap;
+}
+
+.account-edit-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.account-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.account-field label {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.account-field--readonly {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.6rem 0;
+  border-bottom: 1px solid var(--line-color, #333);
+  font-size: 0.9rem;
+}
+
+.account-field--readonly label {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+}
+
+.account-input {
+  background-color: var(--dark-bg);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.account-input:focus { border-color: var(--green-accent); }
+
+.account-textarea {
+  background-color: var(--dark-bg);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--text-light);
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  resize: vertical;
+  transition: border-color 0.2s ease;
+}
+
+.account-textarea:focus { border-color: var(--green-accent); }
+
+.account-edit-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
 
 .card {
   background-color: var(--light-dark);

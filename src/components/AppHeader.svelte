@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import './appHeader.css';
-  import { getUser, logout, type User } from '../store/appAuth';
+  import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
   import { canSendAnnouncement } from '../store/accessControl';
   import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
   import {
@@ -43,11 +43,13 @@
 
     window.addEventListener(NOTIFICATION_EVENT, handleChange as EventListener);
     window.addEventListener(THEME_EVENT, handleChange as EventListener);
+    window.addEventListener(AUTH_USER_EVENT, handleChange as EventListener);
     window.addEventListener('storage', handleChange);
 
     return () => {
       window.removeEventListener(NOTIFICATION_EVENT, handleChange as EventListener);
       window.removeEventListener(THEME_EVENT, handleChange as EventListener);
+      window.removeEventListener(AUTH_USER_EVENT, handleChange as EventListener);
       window.removeEventListener('storage', handleChange);
     };
   });

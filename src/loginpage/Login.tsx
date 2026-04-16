@@ -103,6 +103,17 @@ export default function Login() {
           <button type="submit" className="login-btn">로그인</button>
         </form>
 
+        <div className="login-divider">
+          <span>또는</span>
+        </div>
+
+        <button type="button" className="kakao-login-btn" onClick={() => alert('카카오 로그인은 준비 중입니다.')}>
+          <svg className="kakao-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 3C6.477 3 2 6.477 2 10.8c0 2.7 1.636 5.076 4.1 6.544L5.1 21l4.476-2.97A11.1 11.1 0 0 0 12 18.6c5.523 0 10-3.477 10-7.8S17.523 3 12 3z" fill="currentColor"/>
+          </svg>
+          카카오로 로그인
+        </button>
+
         <div className="login-footer">
           <span>계정이 없으신가요?</span>
           <a href="#">회원가입</a>

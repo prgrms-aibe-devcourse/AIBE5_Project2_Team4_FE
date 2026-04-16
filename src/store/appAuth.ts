@@ -112,6 +112,8 @@ export function getUser(): User | null {
   return user;
 }
 
+export const AUTH_USER_EVENT = 'app-auth-user-change';
+
 export function setUser(user: User): void {
   const storage = getStorage();
   if (!storage) {
@@ -120,6 +122,7 @@ export function setUser(user: User): void {
 
   storage.setItem(AUTH_USER_KEY, JSON.stringify(user));
   upsertKnownUser(user);
+  window.dispatchEvent(new Event(AUTH_USER_EVENT));
 }
 
 export function logout(): void {
