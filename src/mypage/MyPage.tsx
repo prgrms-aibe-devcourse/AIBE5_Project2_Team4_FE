@@ -158,7 +158,7 @@ export default function MyPage() {
         userEmail: updatedProposal.userEmail,
         type: 'PROPOSAL_ACCEPTED',
         title: '제안이 수락되었습니다',
-        message: `${updatedProposal.freelancerName} 프리랜서가 "${updatedProposal.projectTitle}" 제안을 수락했습니다.`,
+        message: `${updatedProposal.freelancerName} 도우미가 "${updatedProposal.projectTitle}" 제안을 수락했습니다.`,
         link: '/project',
       });
     }

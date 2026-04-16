@@ -1,11 +1,28 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import './login.css';
 import { DEMO_ACCOUNTS, setUser, type DemoAccount } from '../store/appAuth';
+import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 
 export default function Login() {
+  const [theme, setThemeState] = useState<AppTheme>('dark');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+
+  useEffect(() => {
+    const syncTheme = () => {
+      setThemeState(getTheme());
+    };
+
+    syncTheme();
+    window.addEventListener(THEME_EVENT, syncTheme as EventListener);
+    window.addEventListener('storage', syncTheme);
+
+    return () => {
+      window.removeEventListener(THEME_EVENT, syncTheme as EventListener);
+      window.removeEventListener('storage', syncTheme);
+    };
+  }, []);
 
   const handleSubmit = (e: { preventDefault: () => void }) => {
     e.preventDefault();
@@ -34,8 +51,22 @@ export default function Login() {
     setError('');
   };
 
+  const handleThemeToggle = () => {
+    const nextTheme: AppTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    setThemeState(nextTheme);
+  };
+
   return (
     <div className="login-page">
+      <button
+        type="button"
+        className="login-theme-toggle"
+        onClick={handleThemeToggle}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? '☀' : '☾'}
+      </button>
       <div className="login-card">
         <div className="login-header">
           <h1>로그인</h1>

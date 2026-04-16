@@ -15,10 +15,26 @@
   align-items: center;
 }
 
+.header-logo-wrap {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  text-decoration: none;
+}
+
 .header-logo {
   height: 40px;
   width: auto;
-  mix-blend-mode: screen;
+  mix-blend-mode: var(--header-logo-blend);
+}
+
+.header-logo-text {
+  font-family: Pretendard, -apple-system, sans-serif;
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: var(--text-light);
+  line-height: 1;
 }
 
 .header-menu {
@@ -55,14 +71,36 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  border: 1px solid rgba(155, 168, 130, 0.2);
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid color-mix(in srgb, var(--green-accent) 20%, transparent);
+  background: var(--soft-overlay);
   color: var(--text-light);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
   transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease;
+}
+
+.header-theme-btn {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid color-mix(in srgb, var(--green-accent) 24%, transparent);
+  background: var(--soft-overlay);
+  color: var(--text-light);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: border-color 0.2s ease, background-color 0.2s ease, color 0.2s ease, transform 0.2s ease;
+}
+
+.header-theme-btn:hover {
+  border-color: color-mix(in srgb, var(--green-accent) 50%, transparent);
+  background: color-mix(in srgb, var(--green-accent) 14%, transparent);
+  color: var(--green-accent);
+  transform: translateY(-1px);
 }
 
 .header-notification-btn svg {
@@ -100,9 +138,9 @@
   right: 0;
   width: min(360px, calc(100vw - 2rem));
   background: var(--light-dark);
-  border: 1px solid #333;
+  border: 1px solid var(--line-color);
   border-radius: 16px;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+  box-shadow: var(--panel-shadow);
   z-index: 240;
 }
 
@@ -159,8 +197,8 @@
 
 .header-notification-item {
   width: 100%;
-  border: 1px solid #333;
-  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--line-color);
+  background: var(--soft-overlay);
   border-radius: 12px;
   padding: 0.85rem 0.95rem;
   text-align: left;
@@ -170,8 +208,8 @@
 }
 
 .header-notification-item:hover {
-  border-color: rgba(155, 168, 130, 0.35);
-  background: rgba(255, 255, 255, 0.05);
+  border-color: color-mix(in srgb, var(--green-accent) 35%, transparent);
+  background: var(--hover-overlay);
 }
 
 .header-notification-item.unread {
@@ -218,7 +256,7 @@
 .header-announcement-input,
 .header-announcement-textarea {
   width: 100%;
-  border: 1px solid #3a3a3a;
+  border: 1px solid var(--line-soft);
   border-radius: 10px;
   background: var(--dark-bg);
   color: var(--text-light);
@@ -334,7 +372,7 @@
   border-radius: 10px;
   overflow: hidden;
   min-width: 148px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--panel-shadow);
   z-index: 200;
 }
 
@@ -354,7 +392,7 @@
 }
 
 .header-dropdown-item:hover {
-  background-color: #333;
+  background-color: var(--hover-overlay);
 }
 
 .header-dropdown-item.danger {

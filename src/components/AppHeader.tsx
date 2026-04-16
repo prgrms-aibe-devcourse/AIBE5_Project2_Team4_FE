@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import './appHeader.css';
 import { getUser, logout, type User } from '../store/appAuth';
 import { canSendAnnouncement } from '../store/accessControl';
+import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 import {
   type AppNotification,
   NOTIFICATION_EVENT,
@@ -27,8 +28,13 @@ function BellIcon() {
   );
 }
 
+function ThemeIcon({ theme }: { theme: AppTheme }) {
+  return <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>;
+}
+
 export default function AppHeader({ activePage }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [theme, setThemeState] = useState<AppTheme>('dark');
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
@@ -42,15 +48,18 @@ export default function AppHeader({ activePage }: HeaderProps) {
     const syncHeaderState = () => {
       const nextUser = getUser();
       setUser(nextUser);
+      setThemeState(getTheme());
       setNotifications(getNotificationsForUser(nextUser?.email));
     };
 
     syncHeaderState();
     window.addEventListener(NOTIFICATION_EVENT, syncHeaderState as EventListener);
+    window.addEventListener(THEME_EVENT, syncHeaderState as EventListener);
     window.addEventListener('storage', syncHeaderState);
 
     return () => {
       window.removeEventListener(NOTIFICATION_EVENT, syncHeaderState as EventListener);
+      window.removeEventListener(THEME_EVENT, syncHeaderState as EventListener);
       window.removeEventListener('storage', syncHeaderState);
     };
   }, []);
@@ -100,7 +109,15 @@ export default function AppHeader({ activePage }: HeaderProps) {
 
     setNotificationOpen(false);
     if (notification.link) {
-      window.location.href = notification.link;
+      const nextUrl = new URL(notification.link, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+
+      if (nextUrl.pathname === currentUrl.pathname) {
+        window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else {
+        window.location.href = notification.link;
+      }
     }
   }
 
@@ -140,17 +157,33 @@ export default function AppHeader({ activePage }: HeaderProps) {
   return (
     <nav className="header">
       <div className="header-container">
-        <a href="/"><img src="/logo.png" alt="logo" className="header-logo" /></a>
+        <a href="/" className="header-logo-wrap">
+          <img src="/logo.png" alt="logo" className="header-logo" />
+          <span className="header-logo-text">이음</span>
+        </a>
         <ul className="header-menu">
           <li><a href="/#home" className={activePage === 'home' ? 'active' : ''}>HOME</a></li>
           <li><a href="/#services" className={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
-          <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>FREELANCERS</a></li>
+          <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>HELPERS</a></li>
         </ul>
 
         {user ? (
           <div className="header-actions" ref={actionsRef}>
+            <button
+              type="button"
+              className="header-theme-btn"
+              onClick={() => {
+                const nextTheme = theme === 'dark' ? 'light' : 'dark';
+                setTheme(nextTheme);
+                setThemeState(nextTheme);
+              }}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            >
+              <ThemeIcon theme={theme} />
+            </button>
             <button
               type="button"
               className={`header-notification-btn${notificationOpen ? ' active' : ''}`}
@@ -259,7 +292,22 @@ export default function AppHeader({ activePage }: HeaderProps) {
             </div>
           </div>
         ) : (
-          <a href="/login"><button type="button" className="header-login-btn">LOGIN</button></a>
+          <div className="header-actions">
+            <button
+              type="button"
+              className="header-theme-btn"
+              onClick={() => {
+                const nextTheme = theme === 'dark' ? 'light' : 'dark';
+                setTheme(nextTheme);
+                setThemeState(nextTheme);
+              }}
+              aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+              title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+            >
+              <ThemeIcon theme={theme} />
+            </button>
+            <a href="/login"><button type="button" className="header-login-btn">LOGIN</button></a>
+          </div>
         )}
       </div>
     </nav>

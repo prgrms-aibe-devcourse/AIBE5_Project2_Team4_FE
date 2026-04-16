@@ -3,6 +3,7 @@
   import './appHeader.css';
   import { getUser, logout, type User } from '../store/appAuth';
   import { canSendAnnouncement } from '../store/accessControl';
+  import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
   import {
     type AppNotification,
     NOTIFICATION_EVENT,
@@ -16,6 +17,7 @@
   export let activePage: string = '';
 
   let user: User | null = null;
+  let theme: AppTheme = 'dark';
   let notifications: AppNotification[] = [];
   let dropdownOpen = false;
   let notificationOpen = false;
@@ -28,6 +30,7 @@
 
   function syncHeaderState() {
     user = getUser();
+    theme = getTheme();
     notifications = getNotificationsForUser(user?.email);
   }
 
@@ -39,10 +42,12 @@
     };
 
     window.addEventListener(NOTIFICATION_EVENT, handleChange as EventListener);
+    window.addEventListener(THEME_EVENT, handleChange as EventListener);
     window.addEventListener('storage', handleChange);
 
     return () => {
       window.removeEventListener(NOTIFICATION_EVENT, handleChange as EventListener);
+      window.removeEventListener(THEME_EVENT, handleChange as EventListener);
       window.removeEventListener('storage', handleChange);
     };
   });
@@ -84,7 +89,15 @@
 
     notificationOpen = false;
     if (notification.link) {
-      window.location.href = notification.link;
+      const nextUrl = new URL(notification.link, window.location.origin);
+      const currentUrl = new URL(window.location.href);
+
+      if (nextUrl.pathname === currentUrl.pathname) {
+        window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
+        window.dispatchEvent(new PopStateEvent('popstate'));
+      } else {
+        window.location.href = notification.link;
+      }
     }
   }
 
@@ -120,23 +133,41 @@
       closePanels();
     }
   }
+
+  function handleThemeToggle() {
+    const nextTheme: AppTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    theme = nextTheme;
+  }
 </script>
 
 <svelte:window onclick={handleClickOutside} />
 
 <nav class="header">
   <div class="header-container">
-    <a href="/"><img src="/logo.png" alt="logo" class="header-logo" /></a>
+    <a href="/" class="header-logo-wrap">
+      <img src="/logo.png" alt="logo" class="header-logo" />
+      <span class="header-logo-text">이음</span>
+    </a>
     <ul class="header-menu">
       <li><a href="/#home" class={activePage === 'home' ? 'active' : ''}>HOME</a></li>
       <li><a href="/#services" class={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
       <li><a href="/#about" class={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
       <li><a href="/#contact" class={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
-      <li><a href="/freelancers" class={activePage === 'freelancers' ? 'active' : ''}>FREELANCERS</a></li>
+      <li><a href="/freelancers" class={activePage === 'freelancers' ? 'active' : ''}>HELPERS</a></li>
     </ul>
 
     {#if user}
       <div class="header-actions">
+        <button
+          type="button"
+          class="header-theme-btn"
+          onclick={handleThemeToggle}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
         <button
           type="button"
           class={`header-notification-btn${notificationOpen ? ' active' : ''}`}
@@ -248,7 +279,18 @@
         </div>
       </div>
     {:else}
-      <a href="/login"><button type="button" class="header-login-btn">LOGIN</button></a>
+      <div class="header-actions">
+        <button
+          type="button"
+          class="header-theme-btn"
+          onclick={handleThemeToggle}
+          aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+          title={theme === 'dark' ? 'Light mode' : 'Dark mode'}
+        >
+          {theme === 'dark' ? '☀' : '☾'}
+        </button>
+        <a href="/login"><button type="button" class="header-login-btn">LOGIN</button></a>
+      </div>
     {/if}
   </div>
 </nav>

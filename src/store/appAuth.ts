@@ -36,7 +36,7 @@ export const DEMO_ACCOUNTS: DemoAccount[] = [
     role: 'ROLE_FREELANCER',
     verified: true,
     basicVerifyStatus: 'APPROVED',
-    bio: '병원 동행과 일상 지원 경험이 많은 프리랜서입니다.',
+    bio: '병원 동행과 일상 지원 경험이 많은 도우미입니다.',
   },
   {
     name: '관리자',

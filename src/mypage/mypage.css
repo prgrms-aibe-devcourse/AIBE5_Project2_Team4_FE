@@ -947,6 +947,294 @@ body {
   font-size: 0.84rem;
 }
 
+/* 마이페이지 프로젝트 모달 */
+.mp-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 200;
+  padding: 1rem;
+}
+
+.mp-modal {
+  background-color: var(--light-dark);
+  border-radius: 20px;
+  padding: 2rem;
+  width: 100%;
+  max-width: 520px;
+  max-height: 90vh;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.mp-modal-close {
+  position: absolute;
+  top: 1.25rem;
+  right: 1.25rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.mp-modal-close:hover { color: var(--text-light); }
+
+.mp-modal-head { display: flex; flex-direction: column; gap: 0.5rem; }
+.mp-modal-badges { display: flex; gap: 0.5rem; align-items: center; }
+
+.mp-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  padding-right: 2rem;
+}
+
+.mp-modal-info {
+  list-style: none;
+  border-radius: 10px;
+  overflow: hidden;
+  border: 1px solid #333;
+}
+.mp-modal-info li {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.88rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid #333;
+}
+.mp-modal-info li:last-child { border-bottom: none; }
+.mp-modal-info li span:first-child { color: var(--text-secondary); }
+
+.mp-modal-desc-label { font-size: 0.82rem; color: var(--text-secondary); margin-bottom: 0.4rem; }
+.mp-modal-desc-text { font-size: 0.9rem; line-height: 1.7; color: var(--text-light); }
+
+.mp-progress-track {
+  display: flex;
+  align-items: flex-start;
+}
+
+.mp-progress-step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex: 1;
+  position: relative;
+}
+
+.mp-progress-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #3a3a3a;
+  border: 2px solid #3a3a3a;
+  z-index: 1;
+  transition: all 0.3s;
+}
+.mp-progress-dot.reached { background: var(--green-accent); border-color: var(--green-accent); }
+
+.mp-progress-label {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  margin-top: 0.4rem;
+  text-align: center;
+}
+.mp-progress-label.current { color: var(--green-accent); font-weight: 600; }
+
+.mp-progress-line {
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  width: 100%;
+  height: 2px;
+  background: #3a3a3a;
+}
+.mp-progress-line.reached { background: var(--green-accent); }
+
+.mp-modal-actions { display: flex; gap: 0.75rem; }
+
+.mp-btn-action {
+  border: none;
+  border-radius: 10px;
+  padding: 0.7rem 1.4rem;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+.mp-btn-action:hover { opacity: 0.85; }
+.mp-btn-review { background-color: var(--green-accent); color: var(--dark-bg); }
+.mp-btn-cancel { background: transparent; border: 1px solid #e07070; color: #e07070; }
+
+.mp-form { display: flex; flex-direction: column; gap: 1.1rem; }
+.mp-form-group { display: flex; flex-direction: column; gap: 0.5rem; }
+.mp-form-group label { font-size: 0.85rem; color: var(--text-secondary); }
+.mp-review-helper { font-size: 0.82rem; color: var(--text-secondary); }
+
+.mypage-project-card { cursor: pointer; transition: transform 0.15s, box-shadow 0.15s; }
+.mypage-project-card:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(0,0,0,0.3); }
+
+.project-tab-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1rem;
+}
+
+.mp-form-input {
+  background-color: var(--dark-bg);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.65rem 1rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  width: 100%;
+}
+.mp-form-input:focus { border-color: var(--green-accent); }
+
+.mp-form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.75rem;
+}
+
+/* 프로젝트 유형 카드 선택기 */
+.mp-type-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 0.5rem;
+}
+
+.mp-type-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.75rem 0.25rem;
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 12px;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.mp-type-card:hover {
+  border-color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.06);
+}
+
+.mp-type-card.selected {
+  border-color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.15);
+}
+
+.mp-type-icon {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+.mp-type-label {
+  font-size: 0.7rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.3;
+  word-break: keep-all;
+  transition: color 0.2s;
+}
+
+.mp-type-card:hover .mp-type-label,
+.mp-type-card.selected .mp-type-label {
+  color: var(--green-accent);
+}
+
+/* Project cards (보호자 프로젝트 관리 탭) */
+.project-card-list {
+  list-style: none;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.project-card {
+  background-color: var(--light-dark);
+  border-radius: 16px;
+  padding: 1.4rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.project-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-type-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  background: rgba(155, 168, 130, 0.12);
+  color: var(--green-accent);
+  border: 1px solid rgba(155, 168, 130, 0.25);
+}
+
+.project-status-badge {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+}
+
+.project-status-badge--requested  { background: rgba(255,255,255,0.06); color: var(--text-secondary); border: 1px solid #3a3a3a; }
+.project-status-badge--accepted   { background: rgba(100,160,220,0.12); color: #6aaed6; border: 1px solid rgba(100,160,220,0.3); }
+.project-status-badge--in_progress{ background: rgba(212,168,75,0.12);  color: #d4a84b; border: 1px solid rgba(212,168,75,0.3); }
+.project-status-badge--completed  { background: rgba(155,168,130,0.15); color: var(--green-accent); border: 1px solid rgba(155,168,130,0.3); }
+.project-status-badge--cancelled  { background: rgba(224,112,112,0.12); color: #e07070; border: 1px solid rgba(224,112,112,0.3); }
+
+.project-card-title {
+  font-size: 0.98rem;
+  font-weight: 600;
+  color: var(--text-light);
+  line-height: 1.4;
+}
+
+.project-card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+.project-card-footer {
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid #333;
+}
+
+.project-card-freelancer {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+}
+
+@media (max-width: 600px) {
+  .project-card-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 .review-tag-row {
   display: flex;
   gap: 0.4rem;

@@ -2,6 +2,9 @@ import type React from 'react';
 import './index.css';
 import { getUser } from './store/appAuth';
 import { canAccessRoute } from './store/accessControl';
+import { initTheme } from './store/theme';
+
+initTheme();
 
 const path = window.location.pathname;
 const user = getUser();

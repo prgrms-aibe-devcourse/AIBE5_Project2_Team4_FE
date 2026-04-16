@@ -2,9 +2,9 @@ import { useEffect, useState } from 'react';
 import './freelancerDetail.css';
 import AppHeader from '../components/AppHeader';
 import { getFreelancerById } from '../store/appFreelancerStore';
-import { getUser } from '../store/appAuth';
+import { getKnownUsers, getUser } from '../store/appAuth';
 import { canReportReview } from '../store/accessControl';
-import { addProposal, getProposals } from '../store/appProposalStore';
+import { addProposal } from '../store/appProposalStore';
 import { getReviewTags, getReviewsForFreelancer, reportReview } from '../store/appReviewStore';
 import { createNotification } from '../store/notificationStore';
 
@@ -19,16 +19,10 @@ export default function FreelancerDetailPage2() {
   const user = getUser();
   const reviewTags = getReviewTags();
 
-  const alreadyProposed = getProposals().some(
-    (proposal) =>
-      proposal.freelancerId === id &&
-      ((user?.email && proposal.userEmail === user.email) || proposal.userName === user?.name),
-  );
-
   const [proposing, setProposing] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
-  const [proposalDone, setProposalDone] = useState(alreadyProposed);
-  const [reportReasons, setReportReasons] = useState<Record<number, string>>({});
+  const [reportingReviewId, setReportingReviewId] = useState<number | null>(null);
+  const [reportReason, setReportReason] = useState('');
 
   useEffect(() => {
     if (!freelancer) {
@@ -78,24 +72,39 @@ export default function FreelancerDetailPage2() {
         type: 'PROPOSAL_RECEIVED',
         title: '새 프로젝트 제안을 받았습니다',
         message: `${user.name}님이 "${project.title}" 프로젝트를 제안했습니다.`,
-        link: '/mypage',
+        link: '/mypage?tab=proposals',
       });
     }
 
-    setProposalDone(true);
+    setSelectedProjectId(null);
     setProposing(false);
   }
 
-  function handleReviewReport(reviewId: number) {
-    const targetReview = reviews.find((review) => review.id === reviewId);
+  function handleReviewReport() {
+    if (!reportingReviewId) return;
+    const targetReview = reviews.find((review) => review.id === reportingReviewId);
     if (!targetReview || !canReportReview(user, targetReview)) {
       window.location.href = '/error?code=403';
       return;
     }
 
-    const reason = reportReasons[reviewId]?.trim() || '부적절한 리뷰로 신고되었습니다.';
-    reportReview(reviewId, reason);
-    setReportReasons((currentReasons) => ({ ...currentReasons, [reviewId]: '' }));
+    const reason = reportReason.trim() || '부적절한 리뷰로 신고되었습니다.';
+    reportReview(reportingReviewId, reason);
+
+    // 관리자에게 알림 전송
+    const admins = getKnownUsers().filter(u => u.role === 'ROLE_ADMIN');
+    admins.forEach(admin => {
+      createNotification({
+        userEmail: admin.email,
+        type: 'PROJECT_STATUS',
+        title: '리뷰 신고가 접수되었습니다',
+        message: `"${targetReview.authorName}"님의 리뷰가 신고되었습니다. 사유: ${reason}`,
+        link: '/mypage?tab=reports',
+      });
+    });
+
+    setReportingReviewId(null);
+    setReportReason('');
   }
 
   return (
@@ -142,8 +151,8 @@ export default function FreelancerDetailPage2() {
             </ul>
 
             {user?.role === 'ROLE_USER' && (
-              proposalDone ? (
-                <button className="fd-propose-btn fd-propose-btn--done" disabled>제안 완료</button>
+              true ? (
+                <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
               ) : (
                 <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
               )
@@ -167,12 +176,26 @@ export default function FreelancerDetailPage2() {
         <section className="fd-section">
           <h2 className="fd-section-title">제공 서비스</h2>
           <div className="fd-services-grid">
-            {freelancer.skills.map((skill) => (
-              <div key={skill} className="fd-service-card">
-                <div className="fd-service-icon">✦</div>
-                <span className="fd-service-label">{skill}</span>
-              </div>
-            ))}
+            {freelancer.skills.map((skill) => {
+              const SKILL_ICON: Record<string, string> = {
+                '병원 동행': '🏥',
+                '외출 보조': '🚶',
+                '생활 지원': '🏠',
+                '생활동행': '🏠',
+                '관공서 업무': '🏛️',
+                '행정 업무': '📋',
+                '일상 대화': '💬',
+                '식사 보조': '🍱',
+                '약 복용 관리': '💊',
+                '운동 보조': '🏃',
+              };
+              return (
+                <div key={skill} className="fd-service-card">
+                  <div className="fd-service-icon">{SKILL_ICON[skill] ?? '✦'}</div>
+                  <span className="fd-service-label">{skill}</span>
+                </div>
+              );
+            })}
           </div>
         </section>
 
@@ -198,16 +221,12 @@ export default function FreelancerDetailPage2() {
                   <p className="fd-review-content">{review.content}</p>
                   <span className="fd-review-date">{review.date}</span>
                   {canReportReview(user, review) && (
-                    <div className="review-report-box">
-                      <input
-                        type="text"
-                        className="review-report-input"
-                        placeholder={`신고 사유 예: ${reviewTags[0]}`}
-                        value={reportReasons[review.id] ?? ''}
-                        onChange={(event) => setReportReasons((currentReasons) => ({ ...currentReasons, [review.id]: event.target.value }))}
-                      />
-                      <button className="btn-cancel" onClick={() => handleReviewReport(review.id)}>신고</button>
-                    </div>
+                    <button
+                      className="fd-report-btn"
+                      onClick={() => { setReportingReviewId(review.id); setReportReason(''); }}
+                    >
+                      신고
+                    </button>
                   )}
                 </li>
               ))}
@@ -215,6 +234,50 @@ export default function FreelancerDetailPage2() {
           )}
         </section>
       </main>
+
+      {reportingReviewId !== null && (() => {
+        const targetReview = reviews.find(r => r.id === reportingReviewId);
+        return (
+          <div className="fd-modal-overlay" onClick={() => setReportingReviewId(null)}>
+            <div className="fd-modal" onClick={e => e.stopPropagation()}>
+              <button className="fd-modal-close" onClick={() => setReportingReviewId(null)}>닫기</button>
+              <h3 className="fd-modal-title">리뷰 신고</h3>
+              <div className="fd-report-info">
+                <p className="fd-report-author">{targetReview?.authorName}님의 리뷰</p>
+                <p className="fd-report-preview">"{targetReview?.content}"</p>
+              </div>
+              <div className="fd-report-form">
+                <label className="fd-report-label">신고 사유</label>
+                <div className="fd-report-tag-row">
+                  {['부적절한 내용', '허위 정보', '광고/스팸', '욕설/비하', '기타'].map(tag => (
+                    <button
+                      key={tag}
+                      type="button"
+                      className={`fd-report-tag${reportReason === tag ? ' selected' : ''}`}
+                      onClick={() => setReportReason(tag)}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  type="text"
+                  className="fd-report-input"
+                  placeholder="직접 입력 (선택사항)"
+                  value={reportReason}
+                  onChange={e => setReportReason(e.target.value)}
+                />
+              </div>
+              <button
+                className="fd-report-submit"
+                onClick={handleReviewReport}
+              >
+                신고 접수
+              </button>
+            </div>
+          </div>
+        );
+      })()}
 
       {proposing && (
         <div className="fd-modal-overlay" onClick={() => setProposing(false)}>

@@ -1,3 +1,5 @@
+import { removeProposalsByProjectId } from './appProposalStore';
+
 export type ProjectType = 'HOSPITAL' | 'GOVERNMENT' | 'OUTING' | 'DAILY' | 'OTHER';
 export type ProjectStatus = 'REQUESTED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
 
@@ -192,6 +194,7 @@ export function assignProjectFreelancer(
 }
 
 export function cancelProject(projectId: number): void {
+  removeProposalsByProjectId(projectId);
   writeProjects(getProjects().filter((project) => project.id !== projectId));
 }
 

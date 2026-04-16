@@ -71,3 +71,21 @@ export function updateProposalStatus(id: number, status: 'ACCEPTED' | 'REJECTED'
   storage.setItem(PROPOSALS_KEY, JSON.stringify(nextProposals));
   return updatedProposal;
 }
+
+export function withdrawProposal(id: number): void {
+  const storage = getStorage();
+  if (!storage) return;
+  storage.setItem(PROPOSALS_KEY, JSON.stringify(getProposals().filter((p) => p.id !== id)));
+}
+
+export function removeProposalsByProjectId(projectId: number): void {
+  const storage = getStorage();
+  if (!storage) {
+    return;
+  }
+
+  storage.setItem(
+    PROPOSALS_KEY,
+    JSON.stringify(getProposals().filter((proposal) => proposal.projectId !== projectId)),
+  );
+}

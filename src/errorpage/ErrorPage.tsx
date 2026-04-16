@@ -1,4 +1,6 @@
 import './error.css';
+import { useEffect, useState } from 'react';
+import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 
 interface ErrorAction {
   label: string;
@@ -54,13 +56,43 @@ const FALLBACK: ErrorConfig = {
 };
 
 export default function ErrorPage() {
+  const [theme, setThemeState] = useState<AppTheme>('dark');
   const params = new URLSearchParams(window.location.search);
   const code = Number(params.get('code')) || 404;
   const config = ERROR_MAP[code] ?? FALLBACK;
   const { action } = config;
 
+  useEffect(() => {
+    const syncTheme = () => {
+      setThemeState(getTheme());
+    };
+
+    syncTheme();
+    window.addEventListener(THEME_EVENT, syncTheme as EventListener);
+    window.addEventListener('storage', syncTheme);
+
+    return () => {
+      window.removeEventListener(THEME_EVENT, syncTheme as EventListener);
+      window.removeEventListener('storage', syncTheme);
+    };
+  }, []);
+
+  const handleThemeToggle = () => {
+    const nextTheme: AppTheme = theme === 'dark' ? 'light' : 'dark';
+    setTheme(nextTheme);
+    setThemeState(nextTheme);
+  };
+
   return (
     <div className="error-page">
+      <button
+        type="button"
+        className="error-theme-toggle"
+        onClick={handleThemeToggle}
+        aria-label={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+      >
+        {theme === 'dark' ? '☀' : '☾'}
+      </button>
       <div className="error-card">
         <div className={`error-symbol error-symbol--${code}`}>{config.symbol}</div>
         <p className={`error-code error-code--${code}`}>{code}</p>
