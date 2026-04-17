@@ -66,7 +66,6 @@ export default function AppHeader({ activePage }: HeaderProps) {
       if (actionsRef.current && !actionsRef.current.contains(event.target as Node)) {
         setDropdownOpen(false);
         setNotificationOpen(false);
-        setAnnouncementOpen(false);
       }
     };
 
@@ -131,7 +130,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
           <span className="header-logo-text">이음</span>
         </a>
         <ul className="header-menu">
-          <li><a href="/#home" className={activePage === 'home' ? 'active' : ''}>HOME</a></li>
+          <li><a href="/" className={activePage === 'home' ? 'active' : ''}>HOME</a></li>
           <li><a href="/#services" className={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>

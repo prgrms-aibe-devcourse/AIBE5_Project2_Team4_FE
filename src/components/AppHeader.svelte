@@ -119,7 +119,7 @@
       <span class="header-logo-text">이음</span>
     </a>
     <ul class="header-menu">
-      <li><a href="/#home" class={activePage === 'home' ? 'active' : ''}>HOME</a></li>
+      <li><a href="/" class={activePage === 'home' ? 'active' : ''}>HOME</a></li>
       <li><a href="/#services" class={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
       <li><a href="/#about" class={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
       <li><a href="/#contact" class={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>

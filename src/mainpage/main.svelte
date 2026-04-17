@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onMount } from 'svelte';
   import './main.css';
   import AppHeader from '../components/AppHeader.svelte';
 
@@ -12,6 +13,14 @@
       video.currentTime = (e.clientX / window.innerWidth) * video.duration;
     });
   }
+
+  onMount(() => {
+    const hash = window.location.hash;
+    if (hash) {
+      const el = document.querySelector(hash);
+      if (el) el.scrollIntoView({ behavior: 'smooth' });
+    }
+  });
 </script>
 
 <svelte:window onmousemove={handleMouseMove} />

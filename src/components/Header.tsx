@@ -35,7 +35,7 @@ export default function Header({ activePage }: HeaderProps) {
       <div className="header-container">
         <a href="/"><img src="/logo.png" alt="logo" className="header-logo" /></a>
         <ul className="header-menu">
-          <li><a href="/#home" className={activePage === 'home' ? 'active' : ''}>HOME</a></li>
+          <li><a href="/" className={activePage === 'home' ? 'active' : ''}>HOME</a></li>
           <li><a href="/#services" className={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
