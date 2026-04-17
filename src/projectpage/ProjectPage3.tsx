@@ -35,18 +35,12 @@ import {
   withdrawProposal,
   type Proposal,
 } from '../store/appProposalStore';
+import ProjectFormModal from './ProjectFormModal';
+import ReviewModal from './ReviewModal';
+import ProposalTab from './ProposalTab';
 
 type StatusFilter = 'ALL' | ProjectStatus;
 type PageTab = 'projects' | 'proposals';
-
-const PROJECT_TYPES: ProjectType[] = ['HOSPITAL', 'GOVERNMENT', 'OUTING', 'DAILY', 'OTHER'];
-const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
-  HOSPITAL: '병원',
-  GOVERNMENT: '관공서',
-  OUTING: '외출',
-  DAILY: '생활 지원',
-  OTHER: '기타',
-};
 
 const PROJECT_STATUSES: ProjectStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'];
 const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
@@ -57,24 +51,20 @@ const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   CANCELLED: '취소',
 };
 
+const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
+  HOSPITAL: '병원',
+  GOVERNMENT: '관공서',
+  OUTING: '외출',
+  DAILY: '생활 지원',
+  OTHER: '기타',
+};
+
 const STATUS_COLOR: Record<ProjectStatus, string> = {
   REQUESTED: 'status--request',
   ACCEPTED: 'status--accept',
   IN_PROGRESS: 'status--progress',
   COMPLETED: 'status--done',
   CANCELLED: 'status--done',
-};
-
-const PROPOSAL_STATUS_LABEL: Record<Proposal['status'], string> = {
-  PENDING: '대기 중',
-  ACCEPTED: '수락됨',
-  REJECTED: '거절됨',
-};
-
-const PROPOSAL_STATUS_COLOR: Record<Proposal['status'], string> = {
-  PENDING: 'status--request',
-  ACCEPTED: 'status--accept',
-  REJECTED: 'status--done',
 };
 
 const EMPTY_FORM = {
@@ -409,92 +399,12 @@ export default function ProjectPage3() {
 
         {/* 제안 탭 */}
         {activeTab === 'proposals' && (
-          <>
-            {proposals.length === 0 ? (
-              <div className="project-empty">
-                <p>{isFreelancer ? '받은 제안이 없습니다.' : '보낸 제안이 없습니다.'}</p>
-              </div>
-            ) : (
-              <ul className="proposal-list">
-                {proposals.map((proposal) => (
-                  <li key={proposal.id} className="proposal-card">
-                    <div className="proposal-card-top">
-                      <div className="proposal-card-meta">
-                        <span className="project-type-badge">{proposal.projectType}</span>
-                        <span className={`project-status ${PROPOSAL_STATUS_COLOR[proposal.status]}`}>
-                          {PROPOSAL_STATUS_LABEL[proposal.status]}
-                        </span>
-                      </div>
-                      <span className="proposal-card-date">{proposal.sentAt}</span>
-                    </div>
-
-                    <h3 className="proposal-card-title">{proposal.projectTitle}</h3>
-
-                    <div className="proposal-card-info">
-                      {isFreelancer ? (
-                        <>
-                          <span>보낸 사람: {proposal.userName}</span>
-                          <span>일정: {proposal.date} {proposal.time}</span>
-                          <span>위치: {proposal.location}</span>
-                        </>
-                      ) : (
-                        <>
-                          <span>헬퍼: {proposal.freelancerName}</span>
-                          <span>일정: {proposal.date} {proposal.time}</span>
-                          <span>위치: {proposal.location}</span>
-                        </>
-                      )}
-                    </div>
-
-                    {proposal.description && (
-                      <p className="proposal-card-desc">{proposal.description}</p>
-                    )}
-
-                    <div className="proposal-card-actions">
-                      {isFreelancer ? (
-                        proposal.status === 'PENDING' ? (
-                          <>
-                            <button
-                              type="button"
-                              className="proposal-btn proposal-btn--accept"
-                              onClick={() => handleProposalAction(proposal, 'ACCEPTED')}
-                            >
-                              수락
-                            </button>
-                            <button
-                              type="button"
-                              className="proposal-btn proposal-btn--reject"
-                              onClick={() => handleProposalAction(proposal, 'REJECTED')}
-                            >
-                              거절
-                            </button>
-                          </>
-                        ) : (
-                          <span className="proposal-status-text">
-                            {proposal.status === 'ACCEPTED' ? '수락됨' : '거절됨'}
-                          </span>
-                        )
-                      ) : (
-                        proposal.status === 'PENDING' ? (
-                          <button
-                            type="button"
-                            className="proposal-btn proposal-btn--reject"
-                            onClick={() => handleProposalWithdraw(proposal.id)}
-                          >
-                            제안 철회
-                          </button>
-                        ) : (
-                          <span className="proposal-status-text">
-                            {proposal.status === 'ACCEPTED' ? '수락됨' : '거절됨'}
-                          </span>
-                        )
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </>
+          <ProposalTab
+            proposals={proposals}
+            isFreelancer={isFreelancer}
+            onAction={handleProposalAction}
+            onWithdraw={handleProposalWithdraw}
+          />
         )}
       </main>
 
@@ -586,193 +496,39 @@ export default function ProjectPage3() {
 
       {/* 프로젝트 수정 모달 */}
       {showEditModal && selectedProject && (
-        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setShowEditModal(false)}>닫기</button>
-            <h2 className="modal-title">프로젝트 수정</h2>
-
-            <form className="create-form" onSubmit={handleEditSubmit}>
-              <div className="form-group">
-                <label>제목</label>
-                <input
-                  type="text"
-                  placeholder="프로젝트 제목을 입력하세요."
-                  value={editForm.title}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, title: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>유형</label>
-                <div className="type-selector">
-                  {PROJECT_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`type-btn${editForm.type === type ? ' selected' : ''}`}
-                      onClick={() => setEditForm((prev) => ({ ...prev, type }))}
-                    >
-                      {PROJECT_TYPE_LABEL[type]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>날짜</label>
-                  <input type="date" value={editForm.date}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, date: e.target.value }))} required />
-                </div>
-                <div className="form-group">
-                  <label>시간</label>
-                  <input type="time" value={editForm.time}
-                    onChange={(e) => setEditForm((prev) => ({ ...prev, time: e.target.value }))} required />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>위치</label>
-                <input type="text" placeholder="주소를 입력하세요." value={editForm.location}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, location: e.target.value }))} required />
-              </div>
-
-              <div className="form-group">
-                <label>요청 사항</label>
-                <textarea placeholder="필요한 도움을 자세히 입력하세요." value={editForm.description}
-                  onChange={(e) => setEditForm((prev) => ({ ...prev, description: e.target.value }))} rows={4} />
-              </div>
-
-              <button type="submit" className="btn-create form-submit">수정 저장</button>
-            </form>
-          </div>
-        </div>
+        <ProjectFormModal
+          mode="edit"
+          form={editForm}
+          onClose={() => setShowEditModal(false)}
+          onSubmit={handleEditSubmit}
+          onFieldChange={(field, value) => setEditForm((prev) => ({ ...prev, [field]: value }))}
+        />
       )}
 
       {/* 프로젝트 생성 모달 */}
       {showCreateModal && (
-        <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setShowCreateModal(false)}>닫기</button>
-            <h2 className="modal-title">새 프로젝트</h2>
-
-            <form className="create-form" onSubmit={handleCreate}>
-              <div className="form-group">
-                <label>제목</label>
-                <input
-                  type="text"
-                  placeholder="프로젝트 제목을 입력하세요."
-                  value={form.title}
-                  onChange={(e) => setForm((prev) => ({ ...prev, title: e.target.value }))}
-                  required
-                />
-              </div>
-
-              <div className="form-group">
-                <label>유형</label>
-                <div className="type-selector">
-                  {PROJECT_TYPES.map((type) => (
-                    <button
-                      key={type}
-                      type="button"
-                      className={`type-btn${form.type === type ? ' selected' : ''}`}
-                      onClick={() => setForm((prev) => ({ ...prev, type }))}
-                    >
-                      {PROJECT_TYPE_LABEL[type]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-row">
-                <div className="form-group">
-                  <label>날짜</label>
-                  <input type="date" value={form.date}
-                    onChange={(e) => setForm((prev) => ({ ...prev, date: e.target.value }))} required />
-                </div>
-                <div className="form-group">
-                  <label>시간</label>
-                  <input type="time" value={form.time}
-                    onChange={(e) => setForm((prev) => ({ ...prev, time: e.target.value }))} required />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>위치</label>
-                <input type="text" placeholder="주소를 입력하세요." value={form.location}
-                  onChange={(e) => setForm((prev) => ({ ...prev, location: e.target.value }))} required />
-              </div>
-
-              <div className="form-group">
-                <label>요청 사항</label>
-                <textarea placeholder="필요한 도움을 자세히 입력하세요." value={form.description}
-                  onChange={(e) => setForm((prev) => ({ ...prev, description: e.target.value }))} rows={4} />
-              </div>
-
-              <button type="submit" className="btn-create form-submit">프로젝트 등록</button>
-            </form>
-          </div>
-        </div>
+        <ProjectFormModal
+          mode="create"
+          form={form}
+          onClose={() => setShowCreateModal(false)}
+          onSubmit={handleCreate}
+          onFieldChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
+        />
       )}
 
       {/* 리뷰 모달 */}
       {showReviewModal && selectedProject && (
-        <div className="modal-overlay" onClick={() => setShowReviewModal(false)}>
-          <div className="modal review-modal" onClick={(e) => e.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setShowReviewModal(false)}>닫기</button>
-            <h2 className="modal-title">{selectedProject.title} 리뷰</h2>
-
-            <form className="create-form" onSubmit={handleReviewSubmit}>
-              <div className="form-group">
-                <label>별점</label>
-                <div className="review-rating-row">
-                  {[1, 2, 3, 4, 5].map((score) => (
-                    <button
-                      key={score}
-                      type="button"
-                      className={`review-rating-btn${reviewForm.rating === score ? ' selected' : ''}`}
-                      onClick={() => setReviewForm((prev) => ({ ...prev, rating: score }))}
-                    >
-                      {score}점
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>태그</label>
-                <div className="type-selector">
-                  {reviewTags.map((tag) => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`type-btn${reviewForm.tags.includes(tag) ? ' selected' : ''}`}
-                      onClick={() => handleReviewTagToggle(tag)}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label>리뷰 내용</label>
-                <textarea placeholder="완료된 프로젝트 경험을 남겨주세요." value={reviewForm.content}
-                  onChange={(e) => setReviewForm((prev) => ({ ...prev, content: e.target.value }))}
-                  rows={5} required />
-              </div>
-
-              {selectedReview && (
-                <p className="review-helper-text">이미 같은 프로젝트에 작성한 리뷰가 있어 수정 모드로 열렸습니다.</p>
-              )}
-
-              <button type="submit" className="btn-create form-submit">
-                {selectedReview ? '리뷰 수정' : '리뷰 등록'}
-              </button>
-            </form>
-          </div>
-        </div>
+        <ReviewModal
+          project={selectedProject}
+          selectedReview={selectedReview}
+          reviewForm={reviewForm}
+          reviewTags={reviewTags}
+          onClose={() => setShowReviewModal(false)}
+          onSubmit={handleReviewSubmit}
+          onRatingChange={(rating) => setReviewForm((prev) => ({ ...prev, rating }))}
+          onTagToggle={handleReviewTagToggle}
+          onContentChange={(content) => setReviewForm((prev) => ({ ...prev, content }))}
+        />
       )}
     </div>
   );

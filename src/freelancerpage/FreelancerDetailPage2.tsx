@@ -5,7 +5,7 @@ import { getFreelancerById } from '../store/appFreelancerStore';
 import { getKnownUsers, getUser } from '../store/appAuth';
 import { canReportReview } from '../store/accessControl';
 import { addProposal } from '../store/appProposalStore';
-import { getReviewTags, getReviewsForFreelancer, reportReview } from '../store/appReviewStore';
+import { getReviewsForFreelancer, reportReview } from '../store/appReviewStore';
 import { createNotification } from '../store/notificationStore';
 
 const MOCK_USER_PROJECTS = [
@@ -17,8 +17,6 @@ export default function FreelancerDetailPage2() {
   const id = Number(window.location.pathname.split('/').pop());
   const freelancer = getFreelancerById(id);
   const user = getUser();
-  const reviewTags = getReviewTags();
-
   const [proposing, setProposing] = useState(false);
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [reportingReviewId, setReportingReviewId] = useState<number | null>(null);
@@ -84,7 +82,7 @@ export default function FreelancerDetailPage2() {
     if (!reportingReviewId) return;
     const targetReview = reviews.find((review) => review.id === reportingReviewId);
     if (!targetReview || !canReportReview(user, targetReview)) {
-      window.location.href = '/error?code=403';
+      location.assign('/error?code=403');
       return;
     }
 
@@ -151,11 +149,7 @@ export default function FreelancerDetailPage2() {
             </ul>
 
             {user?.role === 'ROLE_USER' && (
-              true ? (
-                <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
-              ) : (
-                <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
-              )
+              <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
             )}
           </div>
 

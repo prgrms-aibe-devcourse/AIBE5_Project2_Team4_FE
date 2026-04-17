@@ -22,21 +22,14 @@ import {
   type ReviewRecord,
 } from '../store/appReviewStore';
 import { createNotification } from '../store/notificationStore';
+import VerifyTab, { type VerifyRequest, STATUS_LABEL } from './tabs/VerifyTab';
+import ReviewsTab from './tabs/ReviewsTab';
+import ReportsTab from './tabs/ReportsTab';
 
 type VerifyStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 type UserTab = 'account' | 'reviews' | 'certify';
 type AdminTab = 'dashboard' | 'freelancers' | 'projects' | 'verify' | 'reports';
 type Tab = UserTab | AdminTab;
-
-interface VerifyRequest {
-  id: number;
-  freelancerId: number;
-  freelancerName: string;
-  freelancerEmail: string;
-  skills: string[];
-  requestedAt: string;
-  status: VerifyStatus;
-}
 
 const INITIAL_VERIFY_REQUESTS: VerifyRequest[] = [
   {
@@ -67,12 +60,6 @@ const INITIAL_VERIFY_REQUESTS: VerifyRequest[] = [
     status: 'APPROVED',
   },
 ];
-
-const STATUS_LABEL: Record<VerifyStatus, string> = {
-  PENDING: '대기중',
-  APPROVED: '승인됨',
-  REJECTED: '반려됨',
-};
 
 const REVIEW_TAGS = getReviewTags();
 
@@ -180,13 +167,6 @@ export default function MyPage2() {
   const filteredVerifyRequests = verifyFilter === 'ALL'
     ? verifyRequests
     : verifyRequests.filter((r) => r.status === verifyFilter);
-
-  const verifyDetail = verifyDetailId !== null
-    ? verifyRequests.find((r) => r.id === verifyDetailId) ?? null
-    : null;
-  const verifyDetailFreelancer = verifyDetail
-    ? FREELANCERS.find((f) => f.id === verifyDetail.freelancerId) ?? null
-    : null;
 
   function handleAccountSave() {
     if (!user || !editName.trim()) return;
@@ -411,75 +391,22 @@ export default function MyPage2() {
         )}
 
         {activeTab === 'reviews' && !isAdmin && (
-          <div className="tab-content">
-            {reviews.length === 0 ? (
-              <p className="empty-msg">작성한 리뷰가 없습니다.</p>
-            ) : (
-              <ul className="review-list">
-                {reviews.map((review) => (
-                  <li key={review.id} className="review-item">
-                    <div className="review-header">
-                      <div>
-                        <span className="review-service">{review.freelancerName}</span>
-                        <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
-                      </div>
-                      <span className="review-date">{review.date}</span>
-                    </div>
-                    <div className="review-tag-row">
-                      {review.tags.map((tag) => <span key={tag} className="skill-tag">{tag}</span>)}
-                    </div>
-                    {!isFreelancer && editingReviewId === review.id ? (
-                      <div className="review-editor">
-                        <div className="review-rating-row">
-                          {[1, 2, 3, 4, 5].map((score) => (
-                            <button
-                              key={score}
-                              type="button"
-                              className={`review-rating-btn${editRating === score ? ' selected' : ''}`}
-                              onClick={() => setEditRating(score)}
-                            >
-                              {score}점
-                            </button>
-                          ))}
-                        </div>
-                        <div className="type-selector">
-                          {REVIEW_TAGS.map((tag) => (
-                            <button
-                              key={tag}
-                              type="button"
-                              className={`type-btn${editTags.includes(tag) ? ' selected' : ''}`}
-                              onClick={() => handleEditTagToggle(tag)}
-                            >
-                              {tag}
-                            </button>
-                          ))}
-                        </div>
-                        <textarea
-                          className="bio-textarea"
-                          value={editContent}
-                          onChange={(e) => setEditContent(e.target.value)}
-                          rows={4}
-                        />
-                        <div className="bio-actions">
-                          <button className="btn-edit" onClick={() => handleReviewUpdate(review.id)}>저장</button>
-                          <button className="btn-cancel" onClick={() => setEditingReviewId(null)}>취소</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <p className="review-content">{review.content}</p>
-                    )}
-                    <div className="review-actions-row">
-                      <button className="btn-edit" onClick={() => startEditReview(review)}>수정</button>
-                      <button className="btn-cancel" onClick={() => handleReviewDelete(review.id)}>삭제</button>
-                      <span className="review-state-text">
-                        {review.blinded ? '블라인드됨' : review.reported ? '신고 접수됨' : '정상 노출'}
-                      </span>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ReviewsTab
+            reviews={reviews}
+            isFreelancer={isFreelancer}
+            editingReviewId={editingReviewId}
+            editRating={editRating}
+            editTags={editTags}
+            editContent={editContent}
+            reviewTags={REVIEW_TAGS}
+            setEditingReviewId={setEditingReviewId}
+            setEditRating={setEditRating}
+            setEditContent={setEditContent}
+            handleEditTagToggle={handleEditTagToggle}
+            handleReviewUpdate={handleReviewUpdate}
+            handleReviewDelete={handleReviewDelete}
+            startEditReview={startEditReview}
+          />
         )}
 
         {activeTab === 'certify' && isFreelancer && (
@@ -567,191 +494,25 @@ export default function MyPage2() {
         )}
 
         {activeTab === 'verify' && isAdmin && (
-          <div className="tab-content">
-            <div className="verify-toolbar">
-              {(['ALL', 'PENDING', 'APPROVED', 'REJECTED'] as const).map((f) => (
-                <button
-                  key={f}
-                  className={`filter-btn filter-btn--${f.toLowerCase()}${verifyFilter === f ? ' active' : ''}`}
-                  onClick={() => setVerifyFilter(f)}
-                >
-                  {f === 'ALL' ? `전체 ${verifyRequests.length}` : `${STATUS_LABEL[f]} ${verifyRequests.filter((r) => r.status === f).length}`}
-                </button>
-              ))}
-            </div>
-            <ul className="verify-list">
-              {filteredVerifyRequests.map((request) => {
-                const fl = FREELANCERS.find((f) => f.id === request.freelancerId);
-                return (
-                  <li key={request.id} className="verify-item">
-                    <div className="verify-item-left">
-                      <div className="verify-avatar">
-                        {fl?.photo
-                          ? <img src={fl.photo} alt={fl.name} className="verify-avatar-img" />
-                          : <span className="verify-avatar-initial">{request.freelancerName[0]}</span>
-                        }
-                      </div>
-                      <div className="verify-info">
-                        <div className="verify-name">{request.freelancerName}</div>
-                        <div className="verify-email">{request.freelancerEmail}</div>
-                        <div className="verify-skills">
-                          {request.skills.map((skill) => <span key={skill} className="skill-tag">{skill}</span>)}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="verify-right">
-                      <span className="verify-date">{request.requestedAt}</span>
-                      <button
-                        className="verify-btn verify-btn--detail"
-                        onClick={() => setVerifyDetailId(request.id)}
-                      >
-                        상세보기
-                      </button>
-                      {request.status === 'PENDING' ? (
-                        <div className="verify-actions">
-                          <button className="verify-btn verify-btn--approve" onClick={() => handleVerify(request.id, 'APPROVED')}>승인</button>
-                          <button className="verify-btn verify-btn--reject" onClick={() => handleVerify(request.id, 'REJECTED')}>반려</button>
-                        </div>
-                      ) : (
-                        <span className={`verify-status verify-status--${request.status.toLowerCase()}`}>
-                          {STATUS_LABEL[request.status]}
-                        </span>
-                      )}
-                    </div>
-                  </li>
-                );
-              })}
-              {filteredVerifyRequests.length === 0 && (
-                <p className="empty-msg">해당 상태의 요청이 없습니다.</p>
-              )}
-            </ul>
-          </div>
+          <VerifyTab
+            verifyRequests={verifyRequests}
+            verifyFilter={verifyFilter}
+            setVerifyFilter={setVerifyFilter}
+            filteredVerifyRequests={filteredVerifyRequests}
+            verifyDetailId={verifyDetailId}
+            setVerifyDetailId={setVerifyDetailId}
+            handleVerify={handleVerify}
+          />
         )}
 
         {activeTab === 'reports' && isAdmin && (
-          <div className="tab-content">
-            {reportedReviews.length === 0 ? (
-              <p className="empty-msg">신고된 리뷰가 없습니다.</p>
-            ) : (
-              <ul className="review-list">
-                {reportedReviews.map((review) => (
-                  <li key={review.id} className="review-item">
-                    <div className="review-header">
-                      <div>
-                        <span className="review-service">{review.freelancerName}</span>
-                        <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
-                      </div>
-                      <span className="review-date">{review.date}</span>
-                    </div>
-                    <p className="review-content">{review.content}</p>
-                    <p className="admin-subtext">신고 사유: {review.reportReason}</p>
-                    <div className="review-actions-row">
-                      <button className="btn-edit" onClick={() => handleBlindToggle(review.id)}>
-                        {review.blinded ? '블라인드 해제' : '블라인드'}
-                      </button>
-                      <button className="btn-cancel" onClick={() => handleReportClear(review.id)}>신고 해제</button>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <ReportsTab
+            reportedReviews={reportedReviews}
+            handleBlindToggle={handleBlindToggle}
+            handleReportClear={handleReportClear}
+          />
         )}
       </main>
-
-      {verifyDetail && verifyDetailFreelancer && (
-        <div className="vd-overlay" onClick={() => setVerifyDetailId(null)}>
-          <div className="vd-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="vd-modal-head">
-              <h2>헬퍼 상세 정보</h2>
-              <button type="button" className="avatar-modal-close" onClick={() => setVerifyDetailId(null)}>✕</button>
-            </div>
-
-            <div className="vd-profile">
-              <div className="vd-avatar">
-                {verifyDetailFreelancer.photo
-                  ? <img src={verifyDetailFreelancer.photo} alt={verifyDetailFreelancer.name} className="vd-avatar-img" />
-                  : <span className="vd-avatar-initial">{verifyDetailFreelancer.name[0]}</span>
-                }
-              </div>
-              <div className="vd-profile-info">
-                <div className="vd-name">{verifyDetailFreelancer.name}</div>
-                <div className="vd-email">{verifyDetail.freelancerEmail}</div>
-                <div className="vd-stats">
-                  <span>★ {verifyDetailFreelancer.rating.toFixed(1)}</span>
-                  <span>리뷰 {verifyDetailFreelancer.reviewCount}개</span>
-                  <span>프로젝트 {verifyDetailFreelancer.projectCount}건</span>
-                </div>
-              </div>
-            </div>
-
-            {verifyDetailFreelancer.bio && (
-              <div className="vd-section">
-                <div className="vd-section-label">자기소개</div>
-                <p className="vd-bio">{verifyDetailFreelancer.bio}</p>
-              </div>
-            )}
-
-            <div className="vd-section">
-              <div className="vd-section-label">제공 서비스</div>
-              <div className="vd-tags">
-                {verifyDetailFreelancer.skills.map((s) => <span key={s} className="skill-tag">{s}</span>)}
-              </div>
-            </div>
-
-            <div className="vd-section">
-              <div className="vd-section-label">활동 정보</div>
-              <ul className="vd-info-list">
-                <li><span>가능 시간</span><span>{verifyDetailFreelancer.availableHours}</span></li>
-                <li><span>활동 지역</span><span>{verifyDetailFreelancer.availableRegions.join(', ')}</span></li>
-              </ul>
-            </div>
-
-            <div className="vd-section">
-              <div className="vd-section-label">포트폴리오</div>
-              {verifyDetailFreelancer.portfolio
-                ? (
-                  <div className="vd-portfolio">
-                    <span className="vd-portfolio-icon">📎</span>
-                    <span className="vd-portfolio-name">{verifyDetailFreelancer.portfolio}</span>
-                  </div>
-                )
-                : <span className="vd-empty">첨부된 포트폴리오가 없습니다.</span>
-              }
-            </div>
-
-            <div className="vd-section">
-              <div className="vd-section-label">검증 요청 정보</div>
-              <ul className="vd-info-list">
-                <li><span>요청일</span><span>{verifyDetail.requestedAt}</span></li>
-                <li>
-                  <span>현재 상태</span>
-                  <span className={`verify-status verify-status--${verifyDetail.status.toLowerCase()}`}>
-                    {STATUS_LABEL[verifyDetail.status]}
-                  </span>
-                </li>
-              </ul>
-            </div>
-
-            {verifyDetail.status === 'PENDING' && (
-              <div className="vd-actions">
-                <button
-                  className="verify-btn verify-btn--approve"
-                  onClick={() => { handleVerify(verifyDetail.id, 'APPROVED'); setVerifyDetailId(null); }}
-                >
-                  승인
-                </button>
-                <button
-                  className="verify-btn verify-btn--reject"
-                  onClick={() => { handleVerify(verifyDetail.id, 'REJECTED'); setVerifyDetailId(null); }}
-                >
-                  반려
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {showAvatarModal && (
         <div className="avatar-modal-overlay" onClick={() => setShowAvatarModal(false)}>
