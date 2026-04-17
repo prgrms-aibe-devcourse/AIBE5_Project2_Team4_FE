@@ -52,18 +52,18 @@
       <div class="services-grid">
         <div class="service-card">
           <div class="service-icon">✦</div>
-          <h3>AI 대화</h3>
-          <p>Stella와 자유롭게 대화하며 다양한 정보를 얻고 일상을 함께해보세요.</p>
+          <h3>AI 매칭</h3>
+          <p>Stella가 제안에 알맞는 동행자를 매칭해줍니다.</p>
         </div>
         <div class="service-card">
           <div class="service-icon">◈</div>
-          <h3>맞춤 추천</h3>
-          <p>사용자의 취향과 상황에 맞는 콘텐츠와 서비스를 추천해드립니다.</p>
+          <h3>제안 등록</h3>
+          <p>동행이 필요한 서비스를 등록해보세요.</p>
         </div>
         <div class="service-card">
           <div class="service-icon">⬡</div>
-          <h3>일정 관리</h3>
-          <p>Stella가 일정을 기억하고 알림을 드려 더 스마트한 하루를 만들어드립니다.</p>
+          <h3>헬퍼 검증</h3>
+          <p>헬퍼의 프로필을 열람하여 자신의 제안에 알맞는 동행자를 선택하세요.</p>
         </div>
       </div>
     </div>
