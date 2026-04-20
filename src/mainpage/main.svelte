@@ -31,17 +31,18 @@
   <section class="hero-section" id="home">
     <div class="hero-content">
       <div class="text-container">
-        <h1 class="greeting">Hej !</h1>
+        <h1 class="greeting">안심하고 함께해요 !</h1>
         <p class="description">
-          좋은 서비스로 즐겁고 편합니다. 여러가지 서비스를 서비스 것 보실 걸 합니다.
-          이 여러 치매 주문을 사용해 드릴 관심이 있습니다. 이 여러 치매 주문을 사용해 주시겠어요?
+          이음은 생활 지원이 필요한 분과 믿을 수 있는 메이트를 연결하는 매칭 플랫폼입니다.
+          프로젝트를 등록하고, 검증된 메이트를 직접 탐색해 제안해보세요.
         </p>
         <div class="button-group">
-          <button class="btn-primary" onclick={() => window.location.href = '/ai-match'}>시작하기</button>
-          <button class="btn-secondary">자세히 보기</button>
+          <button class="btn-primary" onclick={() => window.location.href = '/ai-match'}>
+            프로젝트 등록하기
+          </button>
+          <button class="btn-secondary">메이트 둘러보기</button>
         </div>
       </div>
-
     </div>
 
     <div class="character-container">
@@ -57,22 +58,22 @@
   <section class="services-section" id="services">
     <div class="section-container">
       <h2 class="section-title">SERVICES</h2>
-      <p class="section-subtitle">Stella와 함께할 수 있는 것들</p>
+      <p class="section-subtitle">이음과 함께할 수 있는 것들</p>
       <div class="services-grid">
         <div class="service-card">
           <div class="service-icon">✦</div>
-          <h3>AI 매칭</h3>
-          <p>Stella가 제안에 알맞는 동행자를 매칭해줍니다.</p>
+          <h3>프로젝트 등록</h3>
+          <p>필요한 생활 지원 내용을 간편하게 등록하고 원하는 메이트에게 제안해보세요.</p>
         </div>
         <div class="service-card">
           <div class="service-icon">◈</div>
-          <h3>제안 등록</h3>
-          <p>동행이 필요한 서비스를 등록해보세요.</p>
+          <h3>메이트 탐색 · 제안</h3>
+          <p>메이트의 프로필과 경력을 직접 확인하고, 나에게 맞는 동행자를 선택하세요.</p>
         </div>
         <div class="service-card">
           <div class="service-icon">⬡</div>
-          <h3>헬퍼 검증</h3>
-          <p>헬퍼의 프로필을 열람하여 자신의 제안에 알맞는 동행자를 선택하세요.</p>
+          <h3>검증 · 리뷰 체계</h3>
+          <p>메이트 검증과 완료 후 리뷰 시스템으로 믿을 수 있는 매칭 환경을 제공합니다.</p>
         </div>
       </div>
     </div>
@@ -85,31 +86,31 @@
         <div class="about-text">
           <h2 class="section-title">ABOUT</h2>
           <p class="about-description">
-            Stella는 당신의 일상에 자연스럽게 녹아드는 AI 동반자입니다.
-            단순한 도구가 아닌, 함께 성장하고 소통하는 존재로 설계되었습니다.
+            이음은 생활 지원을 단순 심부름이 아닌 신뢰 기반의 재능 거래로 연결합니다.
+            등록부터 매칭, 완료, 리뷰까지 하나의 흐름으로 이어지는 플랫폼입니다.
           </p>
           <ul class="about-list">
-            <li>24시간 언제든 함께하는 AI</li>
-            <li>사용할수록 나를 더 잘 아는 개인화</li>
-            <li>안전하고 신뢰할 수 있는 데이터 보호</li>
+            <li>사용자가 직접 메이트를 탐색하고 제안하는 주도형 매칭</li>
+            <li>검증 시스템으로 신뢰할 수 있는 메이트 선택</li>
+            <li>프로젝트 상태 관리와 리뷰로 투명한 서비스 운영</li>
           </ul>
         </div>
         <div class="about-stats">
           <div class="stat-item">
-            <span class="stat-number">10K+</span>
-            <span class="stat-label">활성 사용자</span>
+            <span class="stat-number">5단계</span>
+            <span class="stat-label">체계적인 프로젝트 흐름</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number">98%</span>
-            <span class="stat-label">만족도</span>
+            <span class="stat-number">100%</span>
+            <span class="stat-label">메이트 신원 검증</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number">24/7</span>
-            <span class="stat-label">서비스 운영</span>
+            <span class="stat-number">실시간</span>
+            <span class="stat-label">프로젝트 상태 관리</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number">5ms</span>
-            <span class="stat-label">평균 응답속도</span>
+            <span class="stat-number">역할</span>
+            <span class="stat-label">사용자 · 메이트 · 관리자</span>
           </div>
         </div>
       </div>
@@ -125,7 +126,7 @@
         <div class="contact-info">
           <div class="contact-item">
             <span class="contact-label">이메일</span>
-            <span class="contact-value">hello@stella.ai</span>
+            <span class="contact-value">hello@ieum.kr</span>
           </div>
           <div class="contact-item">
             <span class="contact-label">운영시간</span>
@@ -149,7 +150,7 @@
   <!-- Footer -->
   <footer class="footer">
     <div class="section-container">
-      <p class="footer-text">© 2025 Stella. All rights reserved.</p>
+      <p class="footer-text">© 2026 이음. All rights reserved.</p>
     </div>
   </footer>
 </div>
