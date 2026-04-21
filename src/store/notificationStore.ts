@@ -1,4 +1,4 @@
-import { getKnownUsers } from './appAuth';
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 export type AnnouncementTarget = 'ALL' | 'ROLE_USER' | 'ROLE_FREELANCER';
 export type AnnouncementType = 'GENERAL' | 'URGENT' | 'SYSTEM' | 'EVENT';
@@ -16,8 +16,6 @@ export interface AnnouncementRecord {
   scheduled: boolean;
   scheduledAt?: string;
 }
-
-const ANNOUNCEMENT_HISTORY_KEY = 'stella_announcement_history';
 
 export type NotificationType =
   | 'PROJECT_STATUS'
@@ -45,184 +43,50 @@ export interface NewNotification {
   link?: string;
 }
 
-const NOTIFICATION_STORAGE_KEY = 'stella_notifications';
-
 export const NOTIFICATION_EVENT = 'stella:notifications-changed';
 
-function getStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
+// Legacy compatibility shim. Live notifications/notices now come from src/api/notifications.ts and src/api/notices.ts.
+export function getNotificationsForUser(_userEmail?: string | null): AppNotification[] {
+  return [];
 }
 
-function emitNotificationChange(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  window.dispatchEvent(new CustomEvent(NOTIFICATION_EVENT));
+export function getUnreadNotificationCount(_userEmail?: string | null): number {
+  return 0;
 }
 
-function readNotifications(): AppNotification[] {
-  const storage = getStorage();
-  if (!storage) {
-    return [];
-  }
-
-  const stored = storage.getItem(NOTIFICATION_STORAGE_KEY);
-  return stored ? (JSON.parse(stored) as AppNotification[]) : [];
+export function createNotification(_notification: NewNotification): AppNotification {
+  throw new Error('notificationStore mock is removed. Use src/api/notifications.ts.');
 }
 
-function writeNotifications(notifications: AppNotification[]): void {
-  const storage = getStorage();
-  if (!storage) {
-    return;
-  }
+export function createNotifications(_notifications: NewNotification[]): void {}
 
-  storage.setItem(NOTIFICATION_STORAGE_KEY, JSON.stringify(notifications));
-  emitNotificationChange();
-}
+export function markNotificationRead(_notificationId: string): void {}
 
-export function getNotificationsForUser(userEmail?: string | null): AppNotification[] {
-  if (!userEmail) {
-    return [];
-  }
-
-  return readNotifications()
-    .filter((notification) => notification.userEmail === userEmail)
-    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
-}
-
-export function getUnreadNotificationCount(userEmail?: string | null): number {
-  return getNotificationsForUser(userEmail).filter((notification) => !notification.read).length;
-}
-
-export function createNotification(notification: NewNotification): AppNotification {
-  const nextNotification: AppNotification = {
-    ...notification,
-    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`,
-    createdAt: new Date().toISOString(),
-    read: false,
-  };
-
-  writeNotifications([nextNotification, ...readNotifications()]);
-  return nextNotification;
-}
-
-export function createNotifications(notifications: NewNotification[]): void {
-  if (notifications.length === 0) {
-    return;
-  }
-
-  const nextNotifications = notifications.map<AppNotification>((notification, index) => ({
-    ...notification,
-    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto
-      ? crypto.randomUUID()
-      : `${Date.now()}-${index}`,
-    createdAt: new Date().toISOString(),
-    read: false,
-  }));
-
-  writeNotifications([...nextNotifications, ...readNotifications()]);
-}
-
-export function markNotificationRead(notificationId: string): void {
-  writeNotifications(
-    readNotifications().map((notification) =>
-      notification.id === notificationId ? { ...notification, read: true } : notification,
-    ),
-  );
-}
-
-export function markAllNotificationsAsRead(userEmail: string): void {
-  writeNotifications(
-    readNotifications().map((notification) =>
-      notification.userEmail === userEmail ? { ...notification, read: true } : notification,
-    ),
-  );
-}
+export function markAllNotificationsAsRead(_userEmail: string): void {}
 
 export function sendAnnouncement(
-  senderName: string,
-  title: string,
-  message: string,
-  senderEmail?: string,
+  _senderName: string,
+  _title: string,
+  _message: string,
+  _senderEmail?: string,
 ): number {
-  const recipients = getKnownUsers().filter((user) => user.email !== senderEmail);
-
-  createNotifications(
-    recipients.map((user) => ({
-      userEmail: user.email,
-      type: 'ANNOUNCEMENT',
-      title,
-      message: `${message}\n\n발송자: ${senderName}`,
-      link: '/',
-    })),
-  );
-
-  return recipients.length;
+  return 0;
 }
 
 export function getAnnouncementHistory(): AnnouncementRecord[] {
-  const storage = getStorage();
-  if (!storage) return [];
-  const stored = storage.getItem(ANNOUNCEMENT_HISTORY_KEY);
-  return stored ? (JSON.parse(stored) as AnnouncementRecord[]) : [];
+  return [];
 }
 
 export function sendAnnouncementWithOptions(
-  senderName: string,
-  senderEmail: string,
-  title: string,
-  message: string,
-  target: AnnouncementTarget,
-  announcementType: AnnouncementType,
-  scheduledAt?: string,
+  _senderName: string,
+  _senderEmail: string,
+  _title: string,
+  _message: string,
+  _target: AnnouncementTarget,
+  _announcementType: AnnouncementType,
+  _scheduledAt?: string,
 ): number {
-  const users = getKnownUsers();
-  const recipients = users.filter((u) => {
-    if (u.email === senderEmail) return false;
-    if (target === 'ROLE_USER') return u.role === 'ROLE_USER';
-    if (target === 'ROLE_FREELANCER') return u.role === 'ROLE_FREELANCER';
-    return true;
-  });
-
-  const scheduled = !!scheduledAt;
-
-  if (!scheduled) {
-    createNotifications(
-      recipients.map((u) => ({
-        userEmail: u.email,
-        type: 'ANNOUNCEMENT' as const,
-        title,
-        message: `${message}\n\n발송자: ${senderName}`,
-        link: '/',
-      })),
-    );
-  }
-
-  const record: AnnouncementRecord = {
-    id: typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`,
-    senderName,
-    senderEmail,
-    title,
-    message,
-    target,
-    announcementType,
-    sentAt: new Date().toISOString(),
-    recipientCount: recipients.length,
-    scheduled,
-    scheduledAt,
-  };
-
-  const storage = getStorage();
-  if (storage) {
-    storage.setItem(ANNOUNCEMENT_HISTORY_KEY, JSON.stringify([record, ...getAnnouncementHistory()]));
-  }
-
-  return recipients.length;
+  return 0;
 }
 
 export function formatNotificationTime(createdAt: string): string {

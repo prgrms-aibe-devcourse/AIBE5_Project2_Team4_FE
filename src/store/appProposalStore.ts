@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+
 export interface Proposal {
   id: number;
   freelancerId: number;
@@ -16,76 +18,19 @@ export interface Proposal {
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
 }
 
-const PROPOSALS_KEY = 'proposals';
-
-function getStorage(): Storage | null {
-  if (typeof window === 'undefined') {
-    return null;
-  }
-
-  return window.localStorage;
-}
-
+// Legacy compatibility shim. Live proposal data now comes from src/api/proposals.ts.
 export function getProposals(): Proposal[] {
-  const storage = getStorage();
-  if (!storage) {
-    return [];
-  }
-
-  const stored = storage.getItem(PROPOSALS_KEY);
-  return stored ? (JSON.parse(stored) as Proposal[]) : [];
+  return [];
 }
 
-export function addProposal(proposal: Omit<Proposal, 'id' | 'sentAt'>): Proposal {
-  const storage = getStorage();
-  const nextProposal: Proposal = {
-    ...proposal,
-    id: Date.now(),
-    sentAt: new Date().toLocaleDateString('ko-KR'),
-  };
-
-  if (!storage) {
-    return nextProposal;
-  }
-
-  storage.setItem(PROPOSALS_KEY, JSON.stringify([...getProposals(), nextProposal]));
-  return nextProposal;
+export function addProposal(_proposal: Omit<Proposal, 'id' | 'sentAt'>): Proposal {
+  throw new Error('appProposalStore mock is removed. Use src/api/proposals.ts.');
 }
 
-export function updateProposalStatus(id: number, status: 'ACCEPTED' | 'REJECTED'): Proposal | null {
-  const storage = getStorage();
-  if (!storage) {
-    return null;
-  }
-
-  let updatedProposal: Proposal | null = null;
-  const nextProposals = getProposals().map((proposal) => {
-    if (proposal.id !== id) {
-      return proposal;
-    }
-
-    updatedProposal = { ...proposal, status };
-    return updatedProposal;
-  });
-
-  storage.setItem(PROPOSALS_KEY, JSON.stringify(nextProposals));
-  return updatedProposal;
+export function updateProposalStatus(_id: number, _status: 'ACCEPTED' | 'REJECTED'): Proposal | null {
+  return null;
 }
 
-export function withdrawProposal(id: number): void {
-  const storage = getStorage();
-  if (!storage) return;
-  storage.setItem(PROPOSALS_KEY, JSON.stringify(getProposals().filter((p) => p.id !== id)));
-}
+export function withdrawProposal(_id: number): void {}
 
-export function removeProposalsByProjectId(projectId: number): void {
-  const storage = getStorage();
-  if (!storage) {
-    return;
-  }
-
-  storage.setItem(
-    PROPOSALS_KEY,
-    JSON.stringify(getProposals().filter((proposal) => proposal.projectId !== projectId)),
-  );
-}
+export function removeProposalsByProjectId(_projectId: number): void {}

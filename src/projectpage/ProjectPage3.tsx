@@ -1,62 +1,53 @@
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
 import './project.css';
 import AppHeader from '../components/AppHeader';
 import { getUser, type User } from '../store/appAuth';
 import {
-  canCancelProject,
-  canCreateProject,
-  canEditProject,
-  canManageProjectStatus,
-  canTransitionProjectTo,
-  canWriteReview,
-} from '../store/accessControl';
-import {
   cancelProject,
+  completeProject,
   createProject,
-  getProjects,
+  getMyProjects,
+  getProject,
+  startProject,
   updateProject,
-  updateProjectStatus,
-  type EditableProjectFields,
-  type Project,
+  type ProjectCreateRequest,
+  type ProjectDetailResponse,
   type ProjectStatus,
-  type ProjectType,
-} from '../store/appProjectStore';
+  type ProjectSummaryResponse,
+} from '../api/projects';
 import {
-  createReview,
-  getReviewByProject,
-  getReviewTags,
-  updateReview,
-  type ReviewRecord,
-} from '../store/appReviewStore';
-import { createNotification } from '../store/notificationStore';
+  acceptProposal,
+  getMyFreelancerProposal,
+  getMyFreelancerProposals,
+  getProjectProposals,
+  rejectProposal,
+  type ProjectProposalSummaryResponse,
+  type ProposalSummaryResponse,
+} from '../api/proposals';
 import {
-  getProposals,
-  updateProposalStatus,
-  withdrawProposal,
-  type Proposal,
-} from '../store/appProposalStore';
-import ProjectFormModal from './ProjectFormModal';
-import ReviewModal from './ReviewModal';
+  createProjectReview,
+  getMyReviews,
+  getReviewTagCodes,
+  updateMyReview,
+  type ReviewDetailResponse,
+  type ReviewSummaryResponse,
+} from '../api/reviews';
+import { getProjectTypeCodes, getRegionCodes } from '../api/codes';
+import { getErrorMessage } from '../lib/errors';
+import { formatDateTime, labelOf } from '../lib/referenceData';
+import ProjectFormModal, { type ProjectFormValues } from './ProjectFormModal';
 import ProposalTab from './ProposalTab';
+import ReviewModal from './ReviewModal';
 
 type StatusFilter = 'ALL' | ProjectStatus;
-type PageTab = 'projects' | 'proposals';
 
-const PROJECT_STATUSES: ProjectStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED'];
+const PROJECT_STATUSES: ProjectStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
 const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   REQUESTED: '요청',
   ACCEPTED: '수락',
   IN_PROGRESS: '진행 중',
   COMPLETED: '완료',
   CANCELLED: '취소',
-};
-
-const PROJECT_TYPE_LABEL: Record<ProjectType, string> = {
-  HOSPITAL: '병원',
-  GOVERNMENT: '관공서',
-  OUTING: '외출',
-  DAILY: '생활 지원',
-  OTHER: '기타',
 };
 
 const STATUS_COLOR: Record<ProjectStatus, string> = {
@@ -67,37 +58,82 @@ const STATUS_COLOR: Record<ProjectStatus, string> = {
   CANCELLED: 'status--done',
 };
 
-const EMPTY_FORM = {
+const EMPTY_FORM: ProjectFormValues = {
   title: '',
-  type: 'HOSPITAL' as ProjectType,
-  date: '',
-  time: '',
-  location: '',
-  description: '',
+  projectTypeCode: '',
+  serviceRegionCode: '',
+  requestedStartAt: '',
+  requestedEndAt: '',
+  serviceAddress: '',
+  serviceDetailAddress: '',
+  requestDetail: '',
 };
 
 const EMPTY_REVIEW_FORM = {
   rating: 5,
-  tags: [] as string[],
+  tagCodes: [] as string[],
   content: '',
 };
 
+function toOptionMap(items: Array<{ code: string; name: string }>): Map<string, string> {
+  return new Map(items.map((item) => [item.code, item.name]));
+}
+
+function toProjectForm(project: ProjectDetailResponse): ProjectFormValues {
+  return {
+    title: project.title,
+    projectTypeCode: project.projectTypeCode,
+    serviceRegionCode: project.serviceRegionCode,
+    requestedStartAt: project.requestedStartAt.slice(0, 16),
+    requestedEndAt: project.requestedEndAt.slice(0, 16),
+    serviceAddress: project.serviceAddress,
+    serviceDetailAddress: project.serviceDetailAddress ?? '',
+    requestDetail: project.requestDetail,
+  };
+}
+
+function toProjectRequest(form: ProjectFormValues): ProjectCreateRequest {
+  return {
+    title: form.title.trim(),
+    projectTypeCode: form.projectTypeCode,
+    serviceRegionCode: form.serviceRegionCode,
+    requestedStartAt: form.requestedStartAt,
+    requestedEndAt: form.requestedEndAt,
+    serviceAddress: form.serviceAddress.trim(),
+    serviceDetailAddress: form.serviceDetailAddress.trim() || undefined,
+    requestDetail: form.requestDetail.trim(),
+  };
+}
+
 export default function ProjectPage3() {
   const [user, setUser] = useState<User | null>(null);
-  const [activeTab, setActiveTab] = useState<PageTab>('projects');
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
-  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [projects, setProjects] = useState<ProjectSummaryResponse[]>([]);
+  const [freelancerProposals, setFreelancerProposals] = useState<ProposalSummaryResponse[]>([]);
+  const [myReviews, setMyReviews] = useState<Record<number, ReviewSummaryResponse>>({});
+  const [selectedProject, setSelectedProject] = useState<ProjectDetailResponse | null>(null);
+  const [selectedProjectProposals, setSelectedProjectProposals] = useState<ProjectProposalSummaryResponse[]>([]);
+  const [selectedReview, setSelectedReview] = useState<ReviewDetailResponse | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
-  const [editForm, setEditForm] = useState<EditableProjectFields>(EMPTY_FORM);
+  const [form, setForm] = useState<ProjectFormValues>(EMPTY_FORM);
+  const [editForm, setEditForm] = useState<ProjectFormValues>(EMPTY_FORM);
   const [reviewForm, setReviewForm] = useState(EMPTY_REVIEW_FORM);
-  const [selectedReview, setSelectedReview] = useState<ReviewRecord | null>(null);
+  const [projectTypeOptions, setProjectTypeOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [regionOptions, setRegionOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [reviewTagOptions, setReviewTagOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
+  const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
+  const [projectDetailLoading, setProjectDetailLoading] = useState(false);
+  const [mutationLoading, setMutationLoading] = useState(false);
 
-  const reviewTags = getReviewTags();
+  const filteredProjects = useMemo(
+    () => statusFilter === 'ALL' ? projects : projects.filter((project) => project.status === statusFilter),
+    [projects, statusFilter],
+  );
 
   useEffect(() => {
     const nextUser = getUser();
@@ -110,203 +146,275 @@ export default function ProjectPage3() {
   }, []);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
 
-    const allProjects = getProjects();
-    const visibleProjects = user.role === 'ROLE_ADMIN'
-      ? allProjects
-      : user.role === 'ROLE_FREELANCER'
-        ? allProjects.filter((p) => p.freelancerEmail === user.email)
-        : allProjects.filter((p) => p.requesterEmail === user.email);
-    setProjects(visibleProjects);
+    const initialize = async () => {
+      setLoading(true);
+      setError('');
 
-    const allProposals = getProposals();
-    const visibleProposals = user.role === 'ROLE_FREELANCER'
-      ? allProposals.filter((p) => p.freelancerEmail === user.email)
-      : allProposals.filter((p) => p.userEmail === user.email);
-    setProposals(visibleProposals);
+      try {
+        const [projectTypes, regions, reviewTags] = await Promise.all([
+          getProjectTypeCodes(),
+          getRegionCodes(),
+          getReviewTagCodes(),
+        ]);
+
+        setProjectTypeOptions(projectTypes.map(({ code, name }) => ({ code, name })));
+        setRegionOptions(regions.map(({ code, name }) => ({ code, name })));
+        setReviewTagOptions(reviewTags.map(({ code, name }) => ({ code, name })));
+        setProjectTypeMap(toOptionMap(projectTypes));
+        setRegionMap(toOptionMap(regions));
+
+        if (user.role === 'ROLE_USER') {
+          const [projectPage, myReviewPage] = await Promise.all([
+            getMyProjects({ page: 0, size: 50 }),
+            getMyReviews({ page: 0, size: 100 }),
+          ]);
+
+          setProjects(projectPage.content);
+          setMyReviews(
+            Object.fromEntries(
+              myReviewPage.content.map((review) => [review.projectId, review]),
+            ),
+          );
+        } else if (user.role === 'ROLE_FREELANCER') {
+          const proposalPage = await getMyFreelancerProposals({ page: 0, size: 50 });
+          setFreelancerProposals(proposalPage.content);
+        }
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '프로젝트 데이터를 불러오지 못했습니다.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void initialize();
   }, [user]);
 
-  const filteredProjects = useMemo(
-    () => statusFilter === 'ALL' ? projects : projects.filter((p) => p.status === statusFilter),
-    [projects, statusFilter]
-  );
-
-  function handleCreate(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!user || !canCreateProject(user) || !form.title || !form.date || !form.time || !form.location) return;
-
-    const nextProject = createProject({
-      ...form,
-      requesterName: user.name,
-      requesterEmail: user.email,
-    });
-
-    setProjects((prev) => [nextProject, ...prev]);
-    setShowCreateModal(false);
-    setForm(EMPTY_FORM);
-
-    createNotification({
-      userEmail: user.email,
-      type: 'PROJECT_STATUS',
-      title: '프로젝트가 등록되었습니다',
-      message: `"${nextProject.title}" 프로젝트 요청이 등록되었습니다.`,
-      link: '/project',
-    });
+  async function refreshUserProjects() {
+    const response = await getMyProjects({ page: 0, size: 50 });
+    setProjects(response.content);
   }
 
-  function handleEditOpen(project: Project) {
-    setEditForm({
-      title: project.title,
-      type: project.type,
-      date: project.date,
-      time: project.time,
-      location: project.location,
-      description: project.description,
-    });
+  async function refreshFreelancerProposals() {
+    const response = await getMyFreelancerProposals({ page: 0, size: 50 });
+    setFreelancerProposals(response.content);
+  }
+
+  async function refreshMyReviews() {
+    const response = await getMyReviews({ page: 0, size: 100 });
+    setMyReviews(Object.fromEntries(response.content.map((review) => [review.projectId, review])));
+  }
+
+  const openProjectDetail = useCallback(async (projectId: number) => {
+    setProjectDetailLoading(true);
+    setError('');
+
+    try {
+      const detail = await getProject(projectId);
+      setSelectedProject(detail);
+
+      if (user?.role === 'ROLE_USER') {
+        const proposals = await getProjectProposals(projectId, { page: 0, size: 20 });
+        setSelectedProjectProposals(proposals.content);
+      } else {
+        setSelectedProjectProposals([]);
+      }
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 상세를 불러오지 못했습니다.'));
+    } finally {
+      setProjectDetailLoading(false);
+    }
+  }, [user?.role]);
+
+  useEffect(() => {
+    if (loading || user?.role !== 'ROLE_USER') {
+      return;
+    }
+
+    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'));
+    if (!Number.isFinite(projectId) || projectId <= 0) {
+      return;
+    }
+
+    if (selectedProject?.projectId === projectId) {
+      return;
+    }
+
+    void openProjectDetail(projectId);
+  }, [loading, openProjectDetail, selectedProject?.projectId, user?.role]);
+
+  async function handleCreate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setMutationLoading(true);
+    setError('');
+
+    try {
+      await createProject(toProjectRequest(form));
+      await refreshUserProjects();
+      setForm(EMPTY_FORM);
+      setShowCreateModal(false);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 생성에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
+    }
+  }
+
+  function handleEditOpen() {
+    if (!selectedProject) {
+      return;
+    }
+
+    setEditForm(toProjectForm(selectedProject));
     setShowEditModal(true);
   }
 
-  function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleEditSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProject || !canEditProject(user, selectedProject)) {
-      window.location.href = '/error?code=403';
+    if (!selectedProject) {
       return;
     }
-    const updated = updateProject(selectedProject.id, editForm);
-    if (!updated) return;
-    setProjects((prev) => prev.map((p) => p.id === updated.id ? updated : p));
-    setSelectedProject(updated);
-    setShowEditModal(false);
-  }
 
-  function handleCancel(projectId: number) {
-    const target = projects.find((p) => p.id === projectId);
-    if (!target || !canCancelProject(user, target)) {
-      window.location.href = '/error?code=403';
-      return;
-    }
-    cancelProject(projectId);
-    setProjects((prev) => prev.filter((p) => p.id !== projectId));
-    setSelectedProject(null);
-  }
+    setMutationLoading(true);
+    setError('');
 
-  function handleStatusUpdate(project: Project, nextStatus: ProjectStatus) {
-    if (!canManageProjectStatus(user, project) || !canTransitionProjectTo(project, nextStatus)) {
-      window.location.href = '/error?code=403';
-      return;
-    }
-    const updated = updateProjectStatus(project.id, nextStatus);
-    if (!updated || !user) return;
-
-    setProjects((prev) => prev.map((p) => p.id === project.id ? updated : p));
-    setSelectedProject(updated);
-
-    createNotification({
-      userEmail: updated.requesterEmail,
-      type: 'PROJECT_STATUS',
-      title: '프로젝트 상태가 변경되었습니다',
-      message: `"${updated.title}" 프로젝트가 ${PROJECT_STATUS_LABEL[nextStatus]} 단계로 변경되었습니다.`,
-      link: '/project',
-    });
-
-    if (updated.freelancerEmail) {
-      createNotification({
-        userEmail: updated.freelancerEmail,
-        type: 'FREELANCER_STATUS',
-        title: '담당 프로젝트 상태가 변경되었습니다',
-        message: `"${updated.title}" 프로젝트가 ${PROJECT_STATUS_LABEL[nextStatus]} 단계로 업데이트되었습니다.`,
-        link: '/project',
-      });
+    try {
+      const updated = await updateProject(selectedProject.projectId, toProjectRequest(editForm));
+      setSelectedProject(updated);
+      await refreshUserProjects();
+      setShowEditModal(false);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 수정에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
     }
   }
 
-  function openReviewModal(project: Project) {
-    if (!user || !canWriteReview(user, project)) {
-      window.location.href = '/error?code=403';
+  async function handleCancelProject(projectId: number) {
+    const reason = window.prompt('취소 사유를 입력해 주세요.');
+    if (!reason?.trim()) {
       return;
     }
-    const existing = getReviewByProject(project.id, user.email);
-    setSelectedProject(project);
-    setSelectedReview(existing);
-    setReviewForm(existing
-      ? { rating: existing.rating, tags: existing.tags, content: existing.content }
+
+    setMutationLoading(true);
+    setError('');
+
+    try {
+      await cancelProject(projectId, reason.trim());
+      await refreshUserProjects();
+      setSelectedProject(null);
+      setSelectedProjectProposals([]);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 취소에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
+    }
+  }
+
+  async function openReviewModal() {
+    if (!selectedProject) {
+      return;
+    }
+
+    const existingSummary = myReviews[selectedProject.projectId];
+    let existingReview: ReviewDetailResponse | null = null;
+
+    if (existingSummary) {
+      existingReview = {
+        ...existingSummary,
+      };
+    }
+
+    setSelectedReview(existingReview);
+    setReviewForm(existingReview
+      ? { rating: existingReview.rating, tagCodes: existingReview.tagCodes, content: existingReview.content }
       : EMPTY_REVIEW_FORM);
     setShowReviewModal(true);
   }
 
-  function handleReviewTagToggle(tag: string) {
-    setReviewForm((prev) => ({
-      ...prev,
-      tags: prev.tags.includes(tag) ? prev.tags.filter((t) => t !== tag) : [...prev.tags, tag],
-    }));
-  }
-
-  function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!selectedProject || !selectedProject.freelancerId || !selectedProject.freelancerName) return;
-    if (!user || !canWriteReview(user, selectedProject)) {
-      window.location.href = '/error?code=403';
+    if (!selectedProject) {
       return;
     }
 
-    if (selectedReview) {
-      updateReview(selectedReview.id, {
-        rating: reviewForm.rating,
-        tags: reviewForm.tags,
-        content: reviewForm.content,
-      });
-    } else {
-      createReview({
-        projectId: selectedProject.id,
-        freelancerId: selectedProject.freelancerId,
-        freelancerName: selectedProject.freelancerName,
-        authorName: user.name,
-        authorEmail: user.email,
-        rating: reviewForm.rating,
-        tags: reviewForm.tags,
-        content: reviewForm.content,
-      });
+    setMutationLoading(true);
+    setError('');
+
+    try {
+      if (selectedReview) {
+        await updateMyReview(selectedReview.reviewId, reviewForm);
+      } else {
+        await createProjectReview(selectedProject.projectId, reviewForm);
+      }
+
+      await refreshMyReviews();
+      setShowReviewModal(false);
+      setSelectedReview(null);
+      setReviewForm(EMPTY_REVIEW_FORM);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '리뷰 저장에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
     }
+  }
 
-    if (selectedProject.freelancerEmail) {
-      createNotification({
-        userEmail: selectedProject.freelancerEmail,
-        type: 'FREELANCER_STATUS',
-        title: '새 리뷰가 등록되었습니다',
-        message: `"${selectedProject.title}" 프로젝트에 대한 리뷰가 등록되었습니다.`,
-        link: '/mypage?tab=reviews',
-      });
+  async function handleProposalAccept(proposalId: number) {
+    setMutationLoading(true);
+    setError('');
+
+    try {
+      await acceptProposal(proposalId);
+      await refreshFreelancerProposals();
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '제안 수락에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
     }
-
-    setShowReviewModal(false);
-    setSelectedReview(null);
-    setReviewForm(EMPTY_REVIEW_FORM);
   }
 
-  function handleProposalAction(proposal: Proposal, status: 'ACCEPTED' | 'REJECTED') {
-    updateProposalStatus(proposal.id, status);
-    setProposals((prev) => prev.map((p) => p.id === proposal.id ? { ...p, status } : p));
+  async function handleProposalReject(proposalId: number) {
+    setMutationLoading(true);
+    setError('');
 
-    createNotification({
-      userEmail: proposal.userEmail ?? '',
-      type: 'PROJECT_STATUS',
-      title: status === 'ACCEPTED' ? '제안이 수락되었습니다' : '제안이 거절되었습니다',
-      message: `"${proposal.projectTitle}" 프로젝트의 제안이 ${status === 'ACCEPTED' ? '수락' : '거절'}되었습니다.`,
-      link: '/project',
-    });
+    try {
+      await rejectProposal(proposalId);
+      await refreshFreelancerProposals();
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '제안 거절에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
+    }
   }
 
-  function handleProposalWithdraw(proposalId: number) {
-    withdrawProposal(proposalId);
-    setProposals((prev) => prev.filter((p) => p.id !== proposalId));
+  async function transitionProposalProject(proposalId: number, nextStatus: 'start' | 'complete') {
+    setMutationLoading(true);
+    setError('');
+
+    try {
+      const proposal = await getMyFreelancerProposal(proposalId);
+      if (nextStatus === 'start') {
+        await startProject(proposal.projectId);
+      } else {
+        await completeProject(proposal.projectId);
+      }
+      await refreshFreelancerProposals();
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 상태 변경에 실패했습니다.'));
+    } finally {
+      setMutationLoading(false);
+    }
   }
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
+  const isUser = user.role === 'ROLE_USER';
   const isFreelancer = user.role === 'ROLE_FREELANCER';
-  const canCreate = canCreateProject(user);
-  const proposalTabLabel = isFreelancer ? '받은 제안' : '보낸 제안';
 
   return (
     <div className="project-page">
@@ -316,42 +424,24 @@ export default function ProjectPage3() {
         <div className="project-header">
           <div>
             <h1 className="project-title">프로젝트</h1>
-            <p className="project-subtitle">프로젝트 현황과 제안 내역을 한 곳에서 관리하세요.</p>
+            <p className="project-subtitle">
+              {isUser && '내 프로젝트를 생성하고 진행 상태를 확인할 수 있습니다.'}
+              {isFreelancer && '받은 제안을 검토하고 프로젝트 상태를 업데이트할 수 있습니다.'}
+              {!isUser && !isFreelancer && '관리자 기능은 마이페이지의 관리자 탭에서 확인할 수 있습니다.'}
+            </p>
           </div>
-          {canCreate && activeTab === 'projects' && (
+          {isUser && (
             <button type="button" className="btn-create" onClick={() => setShowCreateModal(true)}>
               + 새 프로젝트
             </button>
           )}
         </div>
 
-        {/* 탭 바 */}
-        <div className="page-tab-bar">
-          <button
-            type="button"
-            className={`page-tab${activeTab === 'projects' ? ' active' : ''}`}
-            onClick={() => setActiveTab('projects')}
-          >
-            {user.role === 'ROLE_ADMIN' ? '전체 프로젝트' : '프로젝트 관리'}
-          </button>
-          {user.role !== 'ROLE_ADMIN' && (
-            <button
-              type="button"
-              className={`page-tab${activeTab === 'proposals' ? ' active' : ''}`}
-              onClick={() => setActiveTab('proposals')}
-            >
-              {proposalTabLabel}
-              {proposals.filter((p) => p.status === 'PENDING').length > 0 && (
-                <span className="page-tab-badge">
-                  {proposals.filter((p) => p.status === 'PENDING').length}
-                </span>
-              )}
-            </button>
-          )}
-        </div>
+        {error && <p className="login-error">{error}</p>}
 
-        {/* 프로젝트 탭 */}
-        {activeTab === 'projects' && (
+        {loading ? (
+          <div className="project-empty"><p>데이터를 불러오는 중입니다.</p></div>
+        ) : isUser ? (
           <>
             <div className="filter-bar">
               {(['ALL', ...PROJECT_STATUSES] as StatusFilter[]).map((filter) => (
@@ -365,169 +455,190 @@ export default function ProjectPage3() {
                   <span className="filter-count">
                     {filter === 'ALL'
                       ? projects.length
-                      : projects.filter((p) => p.status === filter).length}
+                      : projects.filter((project) => project.status === filter).length}
                   </span>
                 </button>
               ))}
             </div>
 
             {filteredProjects.length === 0 ? (
-              <div className="project-empty"><p>해당 상태의 프로젝트가 없습니다.</p></div>
+              <div className="project-empty"><p>조건에 맞는 프로젝트가 없습니다.</p></div>
             ) : (
               <ul className="project-list">
                 {filteredProjects.map((project) => (
-                  <li key={project.id} className="project-card" onClick={() => setSelectedProject(project)}>
+                  <li
+                    key={project.projectId}
+                    className="project-card"
+                    onClick={() => void openProjectDetail(project.projectId)}
+                  >
                     <div className="project-card-top">
-                      <span className="project-type-badge">{PROJECT_TYPE_LABEL[project.type]}</span>
+                      <span className="project-type-badge">{labelOf(projectTypeMap, project.projectTypeCode)}</span>
                       <span className={`project-status ${STATUS_COLOR[project.status]}`}>
                         {PROJECT_STATUS_LABEL[project.status]}
                       </span>
                     </div>
                     <h3 className="project-card-title">{project.title}</h3>
                     <div className="project-card-meta">
-                      <span>일정 {project.date} {project.time}</span>
-                      <span>위치 {project.location}</span>
+                      <span>일정 {formatDateTime(project.requestedStartAt)}</span>
+                      <span>지역 {labelOf(regionMap, project.serviceRegionCode)}</span>
                     </div>
-                    {project.freelancerName && (
-                      <div className="project-card-freelancer">담당 메이트: {project.freelancerName}</div>
-                    )}
                   </li>
                 ))}
               </ul>
             )}
           </>
-        )}
-
-        {/* 제안 탭 */}
-        {activeTab === 'proposals' && (
+        ) : isFreelancer ? (
           <ProposalTab
-            proposals={proposals}
-            isFreelancer={isFreelancer}
-            onAction={handleProposalAction}
-            onWithdraw={handleProposalWithdraw}
+            proposals={freelancerProposals}
+            onAccept={(proposalId) => void handleProposalAccept(proposalId)}
+            onReject={(proposalId) => void handleProposalReject(proposalId)}
+            onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}
+            onCompleteProject={(proposalId) => void transitionProposalProject(proposalId, 'complete')}
           />
+        ) : (
+          <div className="project-empty">
+            <p>관리자 프로젝트 관리 화면은 마이페이지에서 확인해 주세요.</p>
+            <a href="/mypage?tab=projects" className="btn-create">관리자 프로젝트 보기</a>
+          </div>
         )}
       </main>
 
-      {/* 프로젝트 상세 모달 */}
       {selectedProject && (
         <div className="modal-overlay" onClick={() => setSelectedProject(null)}>
-          <div className="modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
             <button type="button" className="modal-close" onClick={() => setSelectedProject(null)}>닫기</button>
 
-            <div className="modal-head">
-              <div className="modal-badges">
-                <span className="project-type-badge">{PROJECT_TYPE_LABEL[selectedProject.type]}</span>
-                <span className={`project-status ${STATUS_COLOR[selectedProject.status]}`}>
-                  {PROJECT_STATUS_LABEL[selectedProject.status]}
-                </span>
-              </div>
-              <h2 className="modal-title">{selectedProject.title}</h2>
-            </div>
-
-            <ul className="modal-info">
-              <li><span>날짜</span><span>{selectedProject.date}</span></li>
-              <li><span>시간</span><span>{selectedProject.time}</span></li>
-              <li><span>위치</span><span>{selectedProject.location}</span></li>
-              <li><span>등록일</span><span>{selectedProject.createdAt}</span></li>
-              {selectedProject.freelancerName && (
-                <li><span>담당 메이트</span><span>{selectedProject.freelancerName}</span></li>
-              )}
-            </ul>
-
-            <div className="modal-desc">
-              <p className="modal-desc-label">요청 사항</p>
-              <p className="modal-desc-text">{selectedProject.description}</p>
-            </div>
-
-            <div className="progress-track">
-              {PROJECT_STATUSES.map((status, index) => {
-                const currentIndex = PROJECT_STATUSES.indexOf(
-                  selectedProject.status as Exclude<ProjectStatus, 'CANCELLED'>,
-                );
-                return (
-                  <div key={status} className="progress-step">
-                    <div className={`progress-dot${index <= currentIndex ? ' reached' : ''}`} />
-                    <span className={`progress-label${index === currentIndex ? ' current' : ''}`}>
-                      {PROJECT_STATUS_LABEL[status]}
+            {projectDetailLoading ? (
+              <p>상세 정보를 불러오는 중입니다.</p>
+            ) : (
+              <>
+                <div className="modal-head">
+                  <div className="modal-badges">
+                    <span className="project-type-badge">{labelOf(projectTypeMap, selectedProject.projectTypeCode)}</span>
+                    <span className={`project-status ${STATUS_COLOR[selectedProject.status]}`}>
+                      {PROJECT_STATUS_LABEL[selectedProject.status]}
                     </span>
-                    {index < PROJECT_STATUSES.length - 1 && (
-                      <div className={`progress-line${index < currentIndex ? ' reached' : ''}`} />
-                    )}
                   </div>
-                );
-              })}
-            </div>
+                  <h2 className="modal-title">{selectedProject.title}</h2>
+                </div>
 
-            <div className="modal-actions">
-              {selectedProject.status === 'ACCEPTED' && canManageProjectStatus(user, selectedProject) && (
-                <button type="button" className="btn-action btn-review"
-                  onClick={() => handleStatusUpdate(selectedProject, 'IN_PROGRESS')}>
-                  진행 시작
-                </button>
-              )}
-              {selectedProject.status === 'IN_PROGRESS' && canManageProjectStatus(user, selectedProject) && (
-                <button type="button" className="btn-action btn-review"
-                  onClick={() => handleStatusUpdate(selectedProject, 'COMPLETED')}>
-                  완료 처리
-                </button>
-              )}
-              {selectedProject.status === 'COMPLETED' && canWriteReview(user, selectedProject) && (
-                <button type="button" className="btn-action btn-review"
-                  onClick={() => openReviewModal(selectedProject)}>
-                  {getReviewByProject(selectedProject.id, user.email) ? '리뷰 보기' : '리뷰 작성'}
-                </button>
-              )}
-              {selectedProject.status === 'REQUESTED' && canEditProject(user, selectedProject) && (
-                <button type="button" className="btn-action btn-edit-project"
-                  onClick={() => handleEditOpen(selectedProject)}>
-                  수정
-                </button>
-              )}
-              {selectedProject.status === 'REQUESTED' && canCancelProject(user, selectedProject) && (
-                <button type="button" className="btn-action btn-cancel"
-                  onClick={() => handleCancel(selectedProject.id)}>
-                  프로젝트 취소
-                </button>
-              )}
-            </div>
+                <ul className="modal-info">
+                  <li><span>시작</span><span>{formatDateTime(selectedProject.requestedStartAt)}</span></li>
+                  <li><span>종료</span><span>{formatDateTime(selectedProject.requestedEndAt)}</span></li>
+                  <li><span>지역</span><span>{labelOf(regionMap, selectedProject.serviceRegionCode)}</span></li>
+                  <li><span>주소</span><span>{selectedProject.serviceAddress}</span></li>
+                  <li><span>상세 주소</span><span>{selectedProject.serviceDetailAddress || '-'}</span></li>
+                  <li><span>생성일</span><span>{formatDateTime(selectedProject.createdAt)}</span></li>
+                  {selectedProject.cancelledReason && (
+                    <li><span>취소 사유</span><span>{selectedProject.cancelledReason}</span></li>
+                  )}
+                </ul>
+
+                <div className="modal-desc">
+                  <p className="modal-desc-label">요청 상세</p>
+                  <p className="modal-desc-text">{selectedProject.requestDetail}</p>
+                </div>
+
+                {selectedProjectProposals.length > 0 && (
+                  <div className="modal-desc">
+                    <p className="modal-desc-label">보낸 제안</p>
+                    <ul className="proposal-list">
+                      {selectedProjectProposals.map((proposal) => (
+                        <li key={proposal.proposalId} className="proposal-card">
+                          <div className="proposal-card-top">
+                            <div className="proposal-card-meta">
+                              <span className="project-type-badge">{proposal.freelancer.name}</span>
+                              <span className={`project-status ${STATUS_COLOR[selectedProject.status]}`}>
+                                {proposal.status}
+                              </span>
+                            </div>
+                            <span className="proposal-card-date">{formatDateTime(proposal.createdAt)}</span>
+                          </div>
+                          {proposal.message && (
+                            <p className="proposal-card-desc">{proposal.message}</p>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                <div className="modal-actions">
+                  {selectedProject.status === 'REQUESTED' && (
+                    <>
+                      <button
+                        type="button"
+                        className="btn-action btn-edit-project"
+                        onClick={handleEditOpen}
+                        disabled={mutationLoading}
+                      >
+                        수정
+                      </button>
+                      <button
+                        type="button"
+                        className="btn-action btn-cancel"
+                        onClick={() => void handleCancelProject(selectedProject.projectId)}
+                        disabled={mutationLoading}
+                      >
+                        프로젝트 취소
+                      </button>
+                    </>
+                  )}
+                  {selectedProject.status === 'COMPLETED' && (
+                    <button
+                      type="button"
+                      className="btn-action btn-review"
+                      onClick={() => void openReviewModal()}
+                    >
+                      {myReviews[selectedProject.projectId] ? '리뷰 수정' : '리뷰 작성'}
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
 
-      {/* 프로젝트 수정 모달 */}
-      {showEditModal && selectedProject && (
+      {showEditModal && (
         <ProjectFormModal
           mode="edit"
           form={editForm}
+          projectTypeOptions={projectTypeOptions}
+          regionOptions={regionOptions}
           onClose={() => setShowEditModal(false)}
           onSubmit={handleEditSubmit}
           onFieldChange={(field, value) => setEditForm((prev) => ({ ...prev, [field]: value }))}
         />
       )}
 
-      {/* 프로젝트 생성 모달 */}
       {showCreateModal && (
         <ProjectFormModal
           mode="create"
           form={form}
+          projectTypeOptions={projectTypeOptions}
+          regionOptions={regionOptions}
           onClose={() => setShowCreateModal(false)}
           onSubmit={handleCreate}
           onFieldChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
         />
       )}
 
-      {/* 리뷰 모달 */}
       {showReviewModal && selectedProject && (
         <ReviewModal
-          project={selectedProject}
+          projectTitle={selectedProject.title}
           selectedReview={selectedReview}
           reviewForm={reviewForm}
-          reviewTags={reviewTags}
+          reviewTags={reviewTagOptions}
           onClose={() => setShowReviewModal(false)}
           onSubmit={handleReviewSubmit}
           onRatingChange={(rating) => setReviewForm((prev) => ({ ...prev, rating }))}
-          onTagToggle={handleReviewTagToggle}
+          onTagToggle={(tagCode) => setReviewForm((prev) => ({
+            ...prev,
+            tagCodes: prev.tagCodes.includes(tagCode)
+              ? prev.tagCodes.filter((value) => value !== tagCode)
+              : [...prev.tagCodes, tagCode],
+          }))}
           onContentChange={(content) => setReviewForm((prev) => ({ ...prev, content }))}
         />
       )}

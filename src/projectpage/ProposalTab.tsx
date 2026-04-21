@@ -1,96 +1,110 @@
-import type { Proposal } from '../store/appProposalStore';
+import type { ProposalStatus, ProposalSummaryResponse } from '../api/proposals';
+import type { ProjectStatus } from '../api/projects';
+import { formatDateTime } from '../lib/referenceData';
 
-const PROPOSAL_STATUS_LABEL: Record<Proposal['status'], string> = {
+const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
   PENDING: '대기 중',
   ACCEPTED: '수락됨',
   REJECTED: '거절됨',
+  EXPIRED: '만료됨',
+  CANCELLED: '취소됨',
 };
 
-const PROPOSAL_STATUS_COLOR: Record<Proposal['status'], string> = {
-  PENDING: 'status--request',
-  ACCEPTED: 'status--accept',
-  REJECTED: 'status--done',
+const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
+  REQUESTED: '요청',
+  ACCEPTED: '수락',
+  IN_PROGRESS: '진행 중',
+  COMPLETED: '완료',
+  CANCELLED: '취소',
 };
 
 interface Props {
-  proposals: Proposal[];
-  isFreelancer: boolean;
-  onAction: (proposal: Proposal, status: 'ACCEPTED' | 'REJECTED') => void;
-  onWithdraw: (proposalId: number) => void;
+  proposals: ProposalSummaryResponse[];
+  onAccept: (proposalId: number) => void;
+  onReject: (proposalId: number) => void;
+  onStartProject: (proposalId: number) => void;
+  onCompleteProject: (proposalId: number) => void;
 }
 
-export default function ProposalTab({ proposals, isFreelancer, onAction, onWithdraw }: Props) {
+export default function ProposalTab({
+  proposals,
+  onAccept,
+  onReject,
+  onStartProject,
+  onCompleteProject,
+}: Props) {
   return (
     <>
       {proposals.length === 0 ? (
         <div className="project-empty">
-          <p>{isFreelancer ? '받은 제안이 없습니다.' : '보낸 제안이 없습니다.'}</p>
+          <p>받은 제안이 없습니다.</p>
         </div>
       ) : (
         <ul className="proposal-list">
           {proposals.map((proposal) => (
-            <li key={proposal.id} className="proposal-card">
+            <li key={proposal.proposalId} className="proposal-card">
               <div className="proposal-card-top">
                 <div className="proposal-card-meta">
-                  <span className="project-type-badge">{proposal.projectType}</span>
-                  <span className={`project-status ${PROPOSAL_STATUS_COLOR[proposal.status]}`}>
-                    {PROPOSAL_STATUS_LABEL[proposal.status]}
-                  </span>
+                  <span className="project-type-badge">{PROJECT_STATUS_LABEL[proposal.projectStatus]}</span>
+                  <span className="project-status status--request">{PROPOSAL_STATUS_LABEL[proposal.proposalStatus]}</span>
                 </div>
-                <span className="proposal-card-date">{proposal.sentAt}</span>
+                <span className="proposal-card-date">{formatDateTime(proposal.createdAt)}</span>
               </div>
 
               <h3 className="proposal-card-title">{proposal.projectTitle}</h3>
 
               <div className="proposal-card-info">
-                {isFreelancer ? (
-                  <>
-                    <span>보낸 사람: {proposal.userName}</span>
-                    <span>일정: {proposal.date} {proposal.time}</span>
-                    <span>위치: {proposal.location}</span>
-                  </>
-                ) : (
-                  <>
-                    <span>메이트: {proposal.freelancerName}</span>
-                    <span>일정: {proposal.date} {proposal.time}</span>
-                    <span>위치: {proposal.location}</span>
-                  </>
-                )}
+                <span>프로젝트 상태: {PROJECT_STATUS_LABEL[proposal.projectStatus]}</span>
+                <span>응답 시각: {formatDateTime(proposal.respondedAt)}</span>
               </div>
 
-              {proposal.description && (
-                <p className="proposal-card-desc">{proposal.description}</p>
+              {proposal.message && (
+                <p className="proposal-card-desc">{proposal.message}</p>
               )}
 
               <div className="proposal-card-actions">
-                {isFreelancer ? (
-                  proposal.status === 'PENDING' ? (
-                    <>
-                      <button type="button" className="proposal-btn proposal-btn--accept"
-                        onClick={() => onAction(proposal, 'ACCEPTED')}>
-                        수락
-                      </button>
-                      <button type="button" className="proposal-btn proposal-btn--reject"
-                        onClick={() => onAction(proposal, 'REJECTED')}>
-                        거절
-                      </button>
-                    </>
-                  ) : (
-                    <span className="proposal-status-text">
-                      {proposal.status === 'ACCEPTED' ? '수락됨' : '거절됨'}
-                    </span>
-                  )
-                ) : (
-                  proposal.status === 'PENDING' ? (
-                    <button type="button" className="proposal-btn proposal-btn--reject"
-                      onClick={() => onWithdraw(proposal.id)}>
-                      제안 철회
+                {proposal.proposalStatus === 'PENDING' && (
+                  <>
+                    <button
+                      type="button"
+                      className="proposal-btn proposal-btn--accept"
+                      onClick={() => onAccept(proposal.proposalId)}
+                    >
+                      수락
                     </button>
-                  ) : (
-                    <span className="proposal-status-text">
-                      {proposal.status === 'ACCEPTED' ? '수락됨' : '거절됨'}
-                    </span>
-                  )
+                    <button
+                      type="button"
+                      className="proposal-btn proposal-btn--reject"
+                      onClick={() => onReject(proposal.proposalId)}
+                    >
+                      거절
+                    </button>
+                  </>
+                )}
+                {proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'ACCEPTED' && (
+                  <button
+                    type="button"
+                    className="proposal-btn proposal-btn--accept"
+                    onClick={() => onStartProject(proposal.proposalId)}
+                  >
+                    진행 시작
+                  </button>
+                )}
+                {proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'IN_PROGRESS' && (
+                  <button
+                    type="button"
+                    className="proposal-btn proposal-btn--accept"
+                    onClick={() => onCompleteProject(proposal.proposalId)}
+                  >
+                    완료 처리
+                  </button>
+                )}
+                {(proposal.proposalStatus !== 'PENDING'
+                  && !(proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'ACCEPTED')
+                  && !(proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'IN_PROGRESS')) && (
+                  <span className="proposal-status-text">
+                    {PROPOSAL_STATUS_LABEL[proposal.proposalStatus]}
+                  </span>
                 )}
               </div>
             </li>
