@@ -208,7 +208,9 @@ export default function AppHeader({ activePage }: HeaderProps) {
               {dropdownOpen && (
                 <div className="header-dropdown">
                   <a href="/mypage" className="header-dropdown-item">마이페이지</a>
-                  <a href="/project" className="header-dropdown-item">프로젝트</a>
+                  {user.role !== 'ROLE_ADMIN' && (
+                    <a href="/project" className="header-dropdown-item">프로젝트</a>
+                  )}
                   {canSendAnnouncement(user) && (
                     <a href="/announcement" className="header-dropdown-item">공지 발송</a>
                   )}

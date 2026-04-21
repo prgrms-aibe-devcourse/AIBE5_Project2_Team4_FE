@@ -92,8 +92,12 @@ export default function ReviewsTab({
                 <p className="review-content">{review.content}</p>
               )}
               <div className="review-actions-row">
-                <button className="btn-edit" onClick={() => startEditReview(review)}>수정</button>
-                <button className="btn-cancel" onClick={() => handleReviewDelete(review.id)}>삭제</button>
+                {!isFreelancer && (
+                  <>
+                    <button className="btn-edit" onClick={() => startEditReview(review)}>수정</button>
+                    <button className="btn-cancel" onClick={() => handleReviewDelete(review.id)}>삭제</button>
+                  </>
+                )}
                 <span className="review-state-text">
                   {review.blinded ? '블라인드됨' : review.reported ? '신고 접수됨' : '정상 노출'}
                 </span>

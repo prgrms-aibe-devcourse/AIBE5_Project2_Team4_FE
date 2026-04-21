@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import './mypage.css';
 import AppHeader from '../components/AppHeader';
-import { getUser, setUser, type User } from '../store/appAuth';
+import { getUser, getKnownUsers, setUser, updateUserRecord, type User } from '../store/appAuth';
 import {
   canManageVerification,
   canModerateReviews,
@@ -150,10 +150,12 @@ export default function MyPage2() {
   const freelancerSummaries = useMemo(() => (
     FREELANCERS.map((freelancer) => {
       const summary = getFreelancerReviewSummary(freelancer.id);
+      const userRecord = getKnownUsers().find(u => u.email === freelancer.accountEmail);
       return {
         ...freelancer,
         reviewCount: summary.reviewCount,
         rating: summary.reviewCount > 0 ? summary.averageRating : freelancer.rating,
+        basicVerifyStatus: userRecord?.basicVerifyStatus ?? (freelancer.verified ? 'APPROVED' : 'NONE'),
       };
     })
   ), [reportedReviews, reviews]);
@@ -219,6 +221,10 @@ export default function MyPage2() {
 
     const target = nextRequests.find((r) => r.id === requestId);
     if (target) {
+      updateUserRecord(target.freelancerEmail, {
+        basicVerifyStatus: action,
+        verified: action === 'APPROVED',
+      });
       createNotification({
         userEmail: target.freelancerEmail,
         type: 'FREELANCER_STATUS',
@@ -306,7 +312,7 @@ export default function MyPage2() {
               <span className={`role-badge role-badge--${user.role.toLowerCase().replace('role_', '')}`}>
                 {user.role}
               </span>
-              {isFreelancer && user.verified && (
+              {isFreelancer && user.basicVerifyStatus === 'APPROVED' && (
                 <span className="verified-badge">✦ 검증됨</span>
               )}
             </div>
@@ -471,7 +477,12 @@ export default function MyPage2() {
                     <p className="admin-subtext">{freelancer.skills.join(' · ')}</p>
                   </div>
                   <div className="admin-item-right">
-                    <span className="skill-tag">{freelancer.verified ? '검증 완료' : '미검증'}</span>
+                    <span className="skill-tag">
+                      {freelancer.basicVerifyStatus === 'APPROVED' ? '검증 완료'
+                        : freelancer.basicVerifyStatus === 'PENDING' ? '검증 대기'
+                        : freelancer.basicVerifyStatus === 'REJECTED' ? '반려됨'
+                        : '미검증'}
+                    </span>
                     <span className="admin-subtext">평점 {freelancer.rating.toFixed(1)} / 리뷰 {freelancer.reviewCount}개</span>
                   </div>
                 </li>

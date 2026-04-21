@@ -168,3 +168,9 @@ export function findAccountByEmail(email: string): DemoAccount | null {
     a => a.email === email
   ) ?? null;
 }
+
+export function updateUserRecord(email: string, updates: Partial<User>): void {
+  const knownUsers = getKnownUsers();
+  const updated = knownUsers.map(u => u.email === email ? { ...u, ...updates } : u);
+  persistKnownUsers(updated);
+}

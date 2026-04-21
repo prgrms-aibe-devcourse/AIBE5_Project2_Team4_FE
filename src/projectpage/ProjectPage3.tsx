@@ -105,6 +105,10 @@ export default function ProjectPage3() {
       window.location.href = '/login';
       return;
     }
+    if (nextUser.role === 'ROLE_ADMIN') {
+      window.location.href = '/mypage';
+      return;
+    }
 
     setUser(nextUser);
   }, []);
