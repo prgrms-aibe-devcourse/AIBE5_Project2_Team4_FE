@@ -1,109 +1,231 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import './mypage.css';
 import AppHeader from '../components/AppHeader';
-import { getUser, getKnownUsers, setUser, updateUserRecord, type User } from '../store/appAuth';
+import { getUser, setUser, type User } from '../store/appAuth';
+import { canManageVerification, canModerateReviews, canModifyOwnReview } from '../store/accessControl';
+import { resolveApiAssetUrl } from '../api/client';
 import {
-  canManageVerification,
-  canModerateReviews,
-  canModifyOwnReview,
-} from '../store/accessControl';
-import { FREELANCERS } from '../store/appFreelancerStore';
-import { getProjects, type Project } from '../store/appProjectStore';
+  approveAdminVerification,
+  blindAdminReview,
+  cancelAdminProject,
+  getAdminDashboard,
+  getAdminFreelancer,
+  getAdminFreelancers,
+  getAdminProject,
+  getAdminProjects,
+  getAdminReport,
+  getAdminReports,
+  getAdminReviews,
+  getAdminVerification,
+  getAdminVerifications,
+  rejectAdminReport,
+  rejectAdminVerification,
+  resolveAdminReport,
+  unblindAdminReview,
+  updateAdminFreelancerActive,
+  updateAdminFreelancerVisibility,
+  type AdminDashboardResponse,
+  type AdminFreelancerDetailResponse,
+  type AdminFreelancerListItemResponse,
+  type AdminProjectDetailResponse,
+  type AdminProjectSummaryResponse,
+  type AdminReportDetailResponse,
+  type AdminReportListItemResponse,
+  type AdminReviewListItemResponse,
+  type AdminVerificationDetailResponse,
+  type AdminVerificationListItemResponse,
+} from '../api/admin';
+import { getAvailableTimeSlotCodes, getProjectTypeCodes, getRegionCodes, type CodeLookupResponse } from '../api/codes';
 import {
-  clearReviewReport,
-  deleteReview,
-  getFreelancerReviewSummary,
-  getReportedReviews,
-  getReviews,
-  getReviewsByAuthor,
-  getReviewsForFreelancer,
-  getReviewTags,
-  toggleReviewBlind,
-  updateReview,
-  type ReviewRecord,
-} from '../store/appReviewStore';
-import { createNotification } from '../store/notificationStore';
-import VerifyTab, { type VerifyRequest, STATUS_LABEL } from './tabs/VerifyTab';
+  createMyFreelancerProfile,
+  deleteMyFreelancerFile,
+  getMyFreelancerFiles,
+  getMyFreelancerProfile,
+  updateMyFreelancerProfile,
+  uploadMyFreelancerFile,
+  type FreelancerDetailResponse,
+  type FreelancerFileResponse,
+  type FreelancerProfileUpsertRequest,
+} from '../api/freelancers';
+import { getMyReports, type ReportSummaryResponse } from '../api/reports';
+import {
+  deleteMyReview,
+  getMyReviews,
+  getReviewTagCodes,
+  updateMyReview,
+  type ReviewSummaryResponse,
+  type ReviewTagCodeResponse,
+} from '../api/reviews';
+import {
+  createMyVerification,
+  deleteVerificationFile,
+  getMyVerification,
+  getVerificationFiles,
+  getMyVerifications,
+  uploadVerificationFile,
+  type VerificationFileResponse,
+  type VerificationResponse,
+  type VerificationType,
+} from '../api/verifications';
+import { getMyPage, updateMyProfile, type UserMyPageResponse } from '../api/users';
+import { getErrorMessage } from '../lib/errors';
+import { formatDateTime, labelOf } from '../lib/referenceData';
+import VerifyTab from './tabs/VerifyTab';
 import ReviewsTab from './tabs/ReviewsTab';
 import ReportsTab from './tabs/ReportsTab';
 import UsageReportTab from './tabs/UsageReportTab';
-import { getProposals, type Proposal } from '../store/appProposalStore';
+import type { VerifyStatus } from './tabs/verifyTabShared';
 
-type VerifyStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
-type UserTab = 'account' | 'reviews' | 'certify';
+type UserTab = 'account' | 'reviews' | 'reports' | 'certify';
 type AdminTab = 'dashboard' | 'freelancers' | 'projects' | 'verify' | 'reports' | 'usage-report';
 type Tab = UserTab | AdminTab;
 
-const INITIAL_VERIFY_REQUESTS: VerifyRequest[] = [
-  {
-    id: 1,
-    freelancerId: 1,
-    freelancerName: '김지수',
-    freelancerEmail: 'free@stella.ai',
-    skills: ['병원 동행', '행정 업무'],
-    requestedAt: '2025.04.14',
-    status: 'PENDING',
-  },
-  {
-    id: 2,
-    freelancerId: 3,
-    freelancerName: '김철수',
-    freelancerEmail: 'chulsoo@example.com',
-    skills: ['병원 동행', '외출 보조'],
-    requestedAt: '2025.04.12',
-    status: 'PENDING',
-  },
-  {
-    id: 3,
-    freelancerId: 4,
-    freelancerName: '최지수',
-    freelancerEmail: 'jisu@example.com',
-    skills: ['생활 지원', '외출 보조'],
-    requestedAt: '2025.04.10',
-    status: 'APPROVED',
-  },
-];
+interface ProfileFormState {
+  name: string;
+  phone: string;
+  intro: string;
+}
 
-const REVIEW_TAGS = getReviewTags();
+interface FreelancerFormState {
+  careerDescription: string;
+  caregiverYn: boolean;
+  publicYn: boolean;
+  activityRegionCodes: string[];
+  availableTimeSlotCodes: string[];
+  projectTypeCodes: string[];
+}
+
+const EMPTY_PROFILE_FORM: ProfileFormState = {
+  name: '',
+  phone: '',
+  intro: '',
+};
+
+const EMPTY_FREELANCER_FORM: FreelancerFormState = {
+  careerDescription: '',
+  caregiverYn: false,
+  publicYn: true,
+  activityRegionCodes: [],
+  availableTimeSlotCodes: [],
+  projectTypeCodes: [],
+};
+
+const EMPTY_REVIEW_EDITOR = {
+  rating: 5,
+  tagCodes: [] as string[],
+  content: '',
+};
+
+function readRequestedTab(): string | null {
+  return new URLSearchParams(window.location.search).get('tab');
+}
+
+function updateTabQuery(tab: Tab): void {
+  const url = new URL(window.location.href);
+  url.searchParams.set('tab', tab);
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function toFreelancerForm(profile: FreelancerDetailResponse | null): FreelancerFormState {
+  if (!profile) {
+    return EMPTY_FREELANCER_FORM;
+  }
+
+  return {
+    careerDescription: profile.careerDescription ?? '',
+    caregiverYn: profile.caregiverYn,
+    publicYn: profile.publicYn,
+    activityRegionCodes: profile.activityRegionCodes,
+    availableTimeSlotCodes: profile.availableTimeSlotCodes,
+    projectTypeCodes: profile.projectTypeCodes,
+  };
+}
+
+function toFreelancerRequest(form: FreelancerFormState): FreelancerProfileUpsertRequest {
+  return {
+    careerDescription: form.careerDescription.trim() || undefined,
+    caregiverYn: form.caregiverYn,
+    publicYn: form.publicYn,
+    activityRegionCodes: form.activityRegionCodes,
+    availableTimeSlotCodes: form.availableTimeSlotCodes,
+    projectTypeCodes: form.projectTypeCodes,
+  };
+}
+
+function toggleSelection(values: string[], code: string): string[] {
+  return values.includes(code)
+    ? values.filter((value) => value !== code)
+    : [...values, code];
+}
+
+function resolveRequestedTab(user: User | null): Tab {
+  const requestedTab = readRequestedTab();
+
+  if (!user) {
+    return 'account';
+  }
+
+  if (user.role === 'ROLE_ADMIN') {
+    const adminTabs: AdminTab[] = ['dashboard', 'freelancers', 'projects', 'verify', 'reports', 'usage-report'];
+    return requestedTab && adminTabs.includes(requestedTab as AdminTab)
+      ? (requestedTab as AdminTab)
+      : 'dashboard';
+  }
+
+  const userTabs: UserTab[] = user.role === 'ROLE_FREELANCER'
+    ? ['account', 'reviews', 'reports', 'certify']
+    : ['account', 'reviews', 'reports'];
+
+  return requestedTab && userTabs.includes(requestedTab as UserTab)
+    ? (requestedTab as UserTab)
+    : 'account';
+}
 
 export default function MyPage2() {
   const [user, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('account');
-  const [bio, setBio] = useState('');
-  const [editingAccount, setEditingAccount] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [showAvatarModal, setShowAvatarModal] = useState(false);
-  const [pendingAvatar, setPendingAvatar] = useState<string | undefined>(undefined);
-  const [verifyRequests, setVerifyRequests] = useState<VerifyRequest[]>(INITIAL_VERIFY_REQUESTS);
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [reviews, setReviews] = useState<ReviewRecord[]>([]);
-  const [reportedReviews, setReportedReviews] = useState<ReviewRecord[]>([]);
-  const [proposals, setProposals] = useState<Proposal[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [profileForm, setProfileForm] = useState<ProfileFormState>(EMPTY_PROFILE_FORM);
+  const [freelancerForm, setFreelancerForm] = useState<FreelancerFormState>(EMPTY_FREELANCER_FORM);
+  const [summary, setSummary] = useState<UserMyPageResponse | null>(null);
+  const [reviews, setReviews] = useState<ReviewSummaryResponse[]>([]);
+  const [reports, setReports] = useState<ReportSummaryResponse[]>([]);
+  const [reviewTags, setReviewTags] = useState<ReviewTagCodeResponse[]>([]);
   const [editingReviewId, setEditingReviewId] = useState<number | null>(null);
-  const [editRating, setEditRating] = useState(5);
-  const [editTags, setEditTags] = useState<string[]>([]);
-  const [editContent, setEditContent] = useState('');
-  const [verifyDetailId, setVerifyDetailId] = useState<number | null>(null);
-  const [verifyFilter, setVerifyFilter] = useState<'ALL' | VerifyStatus>('ALL');
+  const [editRating, setEditRating] = useState(EMPTY_REVIEW_EDITOR.rating);
+  const [editTagCodes, setEditTagCodes] = useState<string[]>(EMPTY_REVIEW_EDITOR.tagCodes);
+  const [editContent, setEditContent] = useState(EMPTY_REVIEW_EDITOR.content);
 
-  function resolveRequestedTab(nextUser: User | null): Tab {
-    const requestedTab = new URLSearchParams(window.location.search).get('tab');
-    if (!nextUser || !requestedTab) {
-      return nextUser?.role === 'ROLE_ADMIN' ? 'dashboard' : 'account';
-    }
+  const [projectTypeOptions, setProjectTypeOptions] = useState<CodeLookupResponse[]>([]);
+  const [regionOptions, setRegionOptions] = useState<CodeLookupResponse[]>([]);
+  const [timeSlotOptions, setTimeSlotOptions] = useState<CodeLookupResponse[]>([]);
+  const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
+  const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
+  const [timeSlotMap, setTimeSlotMap] = useState<Map<string, string>>(new Map());
 
-    const userTabs: UserTab[] = nextUser.role === 'ROLE_FREELANCER'
-      ? ['account', 'reviews', 'certify']
-      : ['account', 'reviews'];
-    const adminTabs: AdminTab[] = ['dashboard', 'freelancers', 'projects', 'verify', 'reports', 'usage-report'];
-    const allowedTabs = nextUser.role === 'ROLE_ADMIN' ? adminTabs : userTabs;
+  const [freelancerProfile, setFreelancerProfile] = useState<FreelancerDetailResponse | null>(null);
+  const [portfolioFiles, setPortfolioFiles] = useState<FreelancerFileResponse[]>([]);
+  const [verifications, setVerifications] = useState<VerificationResponse[]>([]);
+  const [selectedVerificationId, setSelectedVerificationId] = useState<number | null>(null);
+  const [selectedVerification, setSelectedVerification] = useState<VerificationResponse | null>(null);
+  const [selectedVerificationFiles, setSelectedVerificationFiles] = useState<VerificationFileResponse[]>([]);
+  const [newVerificationType, setNewVerificationType] = useState<VerificationType>('BASIC_IDENTITY');
+  const [newVerificationMessage, setNewVerificationMessage] = useState('');
 
-    return (allowedTabs as Tab[]).includes(requestedTab as Tab)
-      ? (requestedTab as Tab)
-      : nextUser.role === 'ROLE_ADMIN'
-        ? 'dashboard'
-        : 'account';
-  }
+  const [adminDashboard, setAdminDashboard] = useState<AdminDashboardResponse | null>(null);
+  const [adminFreelancers, setAdminFreelancers] = useState<AdminFreelancerListItemResponse[]>([]);
+  const [selectedAdminFreelancer, setSelectedAdminFreelancer] = useState<AdminFreelancerDetailResponse | null>(null);
+  const [adminProjects, setAdminProjects] = useState<AdminProjectSummaryResponse[]>([]);
+  const [selectedAdminProject, setSelectedAdminProject] = useState<AdminProjectDetailResponse | null>(null);
+  const [adminVerifications, setAdminVerifications] = useState<AdminVerificationListItemResponse[]>([]);
+  const [verifyFilter, setVerifyFilter] = useState<VerifyStatus>('ALL');
+  const [selectedAdminVerification, setSelectedAdminVerification] = useState<AdminVerificationDetailResponse | null>(null);
+  const [adminReviews, setAdminReviews] = useState<AdminReviewListItemResponse[]>([]);
+  const [adminReports, setAdminReports] = useState<AdminReportListItemResponse[]>([]);
+  const [selectedAdminReport, setSelectedAdminReport] = useState<AdminReportDetailResponse | null>(null);
 
   useEffect(() => {
     const nextUser = getUser();
@@ -113,15 +235,16 @@ export default function MyPage2() {
     }
 
     setCurrentUser(nextUser);
-    setBio(nextUser.bio ?? '');
-    setEditName(nextUser.name);
     setActiveTab(resolveRequestedTab(nextUser));
   }, []);
 
   useEffect(() => {
     const syncRequestedTab = () => {
       const nextUser = getUser();
-      if (!nextUser) return;
+      if (!nextUser) {
+        return;
+      }
+
       setActiveTab(resolveRequestedTab(nextUser));
     };
 
@@ -129,162 +252,670 @@ export default function MyPage2() {
     return () => window.removeEventListener('popstate', syncRequestedTab);
   }, []);
 
-  function refreshPageData(nextUser = user) {
-    if (!nextUser) return;
-
-    const matchedFreelancer = FREELANCERS.find((f) => f.accountEmail === nextUser.email);
-    setProjects(getProjects());
-    setProposals(getProposals());
-    setReportedReviews(getReportedReviews());
-    setReviews(
-      nextUser.role === 'ROLE_FREELANCER' && matchedFreelancer
-        ? getReviewsForFreelancer(matchedFreelancer.id)
-        : getReviewsByAuthor(nextUser.email),
-    );
-  }
-
   useEffect(() => {
-    refreshPageData();
+    if (!user) {
+      return;
+    }
+
+    const initialize = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const [projectTypes, regions, timeSlots, tagCodes] = await Promise.all([
+          getProjectTypeCodes(),
+          getRegionCodes(),
+          getAvailableTimeSlotCodes(),
+          getReviewTagCodes(),
+        ]);
+
+        setProjectTypeOptions(projectTypes);
+        setRegionOptions(regions);
+        setTimeSlotOptions(timeSlots);
+        setReviewTags(tagCodes);
+        setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
+        setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
+        setTimeSlotMap(new Map(timeSlots.map((item) => [item.code, item.name])));
+
+        const [myPageResponse, reviewPage, reportPage] = await Promise.all([
+          getMyPage(),
+          getMyReviews({ page: 0, size: 100 }),
+          getMyReports({ page: 0, size: 100 }),
+        ]);
+
+        setSummary(myPageResponse);
+        setReviews(reviewPage.content);
+        setReports(reportPage.content);
+        setProfileForm({
+          name: myPageResponse.user.name,
+          phone: myPageResponse.user.phone ?? '',
+          intro: myPageResponse.user.intro ?? '',
+        });
+
+        if (user.role === 'ROLE_FREELANCER') {
+          try {
+            const profile = await getMyFreelancerProfile();
+            setFreelancerProfile(profile);
+            setFreelancerForm(toFreelancerForm(profile));
+
+            const [files, myVerifications] = await Promise.all([
+              getMyFreelancerFiles(),
+              getMyVerifications(),
+            ]);
+
+            setPortfolioFiles(files);
+            setVerifications(myVerifications);
+          } catch (caughtError) {
+            const message = getErrorMessage(caughtError, '');
+            if (!message.includes('404')) {
+              setError(message);
+            }
+            setFreelancerProfile(null);
+            setFreelancerForm(EMPTY_FREELANCER_FORM);
+            setPortfolioFiles([]);
+            setVerifications([]);
+          }
+        }
+
+        if (user.role === 'ROLE_ADMIN') {
+          const [
+            dashboard,
+            freelancerPage,
+            projectPage,
+            verificationPage,
+            reviewPageAdmin,
+            reportPageAdmin,
+          ] = await Promise.all([
+            getAdminDashboard(),
+            getAdminFreelancers({ page: 0, size: 50 }),
+            getAdminProjects({ page: 0, size: 50 }),
+            getAdminVerifications({ page: 0, size: 50 }),
+            getAdminReviews({ page: 0, size: 50 }),
+            getAdminReports({ page: 0, size: 50 }),
+          ]);
+
+          setAdminDashboard(dashboard);
+          setAdminFreelancers(freelancerPage.content);
+          setAdminProjects(projectPage.content);
+          setAdminVerifications(verificationPage.content);
+          setAdminReviews(reviewPageAdmin.content);
+          setAdminReports(reportPageAdmin.content);
+        }
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '마이페이지 데이터를 불러오지 못했습니다.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void initialize();
   }, [user]);
 
-  const freelancerSummaries = useMemo(() => (
-    FREELANCERS.map((freelancer) => {
-      const summary = getFreelancerReviewSummary(freelancer.id);
-      const userRecord = getKnownUsers().find(u => u.email === freelancer.accountEmail);
-      return {
-        ...freelancer,
-        reviewCount: summary.reviewCount,
-        rating: summary.reviewCount > 0 ? summary.averageRating : freelancer.rating,
-        basicVerifyStatus: userRecord?.basicVerifyStatus ?? (freelancer.verified ? 'APPROVED' : 'NONE'),
+  async function refreshProfileSummary() {
+    const [myPageResponse, reviewPage, reportPage] = await Promise.all([
+      getMyPage(),
+      getMyReviews({ page: 0, size: 100 }),
+      getMyReports({ page: 0, size: 100 }),
+    ]);
+
+    setSummary(myPageResponse);
+    setReviews(reviewPage.content);
+    setReports(reportPage.content);
+  }
+
+  async function refreshFreelancerWorkspace() {
+    if (user?.role !== 'ROLE_FREELANCER') {
+      return;
+    }
+
+    try {
+      const profile = await getMyFreelancerProfile();
+      setFreelancerProfile(profile);
+      setFreelancerForm(toFreelancerForm(profile));
+      const [files, myVerifications] = await Promise.all([
+        getMyFreelancerFiles(),
+        getMyVerifications(),
+      ]);
+      setPortfolioFiles(files);
+      setVerifications(myVerifications);
+    } catch {
+      setFreelancerProfile(null);
+      setPortfolioFiles([]);
+      setVerifications([]);
+    }
+  }
+
+  async function refreshAdminData() {
+    if (user?.role !== 'ROLE_ADMIN') {
+      return;
+    }
+
+    const [
+      dashboard,
+      freelancerPage,
+      projectPage,
+      verificationPage,
+      reviewPageAdmin,
+      reportPageAdmin,
+    ] = await Promise.all([
+      getAdminDashboard(),
+      getAdminFreelancers({ page: 0, size: 50 }),
+      getAdminProjects({ page: 0, size: 50 }),
+      getAdminVerifications({ page: 0, size: 50 }),
+      getAdminReviews({ page: 0, size: 50 }),
+      getAdminReports({ page: 0, size: 50 }),
+    ]);
+
+    setAdminDashboard(dashboard);
+    setAdminFreelancers(freelancerPage.content);
+    setAdminProjects(projectPage.content);
+    setAdminVerifications(verificationPage.content);
+    setAdminReviews(reviewPageAdmin.content);
+    setAdminReports(reportPageAdmin.content);
+  }
+
+  function handleTabChange(tab: Tab) {
+    setActiveTab(tab);
+    updateTabQuery(tab);
+  }
+
+  function startEditReview(review: ReviewSummaryResponse) {
+    setEditingReviewId(review.reviewId);
+    setEditRating(review.rating);
+    setEditTagCodes(review.tagCodes);
+    setEditContent(review.content);
+  }
+
+  async function handleAccountSave() {
+    if (!user) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const updated = await updateMyProfile({
+        name: profileForm.name.trim(),
+        phone: profileForm.phone.trim() || undefined,
+        intro: profileForm.intro.trim() || undefined,
+      });
+
+      const updatedUser: User = {
+        ...user,
+        name: updated.name,
+        phone: updated.phone ?? undefined,
+        intro: updated.intro ?? undefined,
+        bio: updated.intro ?? undefined,
+        active: updated.active,
       };
-    })
-  ), [reportedReviews, reviews]);
 
-  if (!user) return null;
-
-  const isAdmin = user.role === 'ROLE_ADMIN';
-  const isFreelancer = user.role === 'ROLE_FREELANCER';
-  const adminMetrics = {
-    freelancerCount: freelancerSummaries.length,
-    activeProjects: projects.filter((p) => p.status !== 'COMPLETED').length,
-    pendingVerify: verifyRequests.filter((r) => r.status === 'PENDING').length,
-    reportedReviewCount: reportedReviews.length,
-  };
-
-  const filteredVerifyRequests = verifyFilter === 'ALL'
-    ? verifyRequests
-    : verifyRequests.filter((r) => r.status === verifyFilter);
-
-  function handleAccountSave() {
-    if (!user || !editName.trim()) return;
-    const updatedUser = { ...user, name: editName.trim(), bio };
-    setUser(updatedUser);
-    setCurrentUser(updatedUser);
-    setEditingAccount(false);
+      setUser(updatedUser);
+      setCurrentUser(updatedUser);
+      await refreshProfileSummary();
+      setNotice('계정 정보를 저장했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '계정 정보 저장에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleAccountCancel() {
-    setEditName(user?.name ?? '');
-    setBio(user?.bio ?? '');
-    setEditingAccount(false);
+  async function handleFreelancerProfileSave() {
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      if (freelancerProfile) {
+        await updateMyFreelancerProfile(toFreelancerRequest(freelancerForm));
+      } else {
+        await createMyFreelancerProfile(toFreelancerRequest(freelancerForm));
+      }
+
+      await refreshFreelancerWorkspace();
+      await refreshProfileSummary();
+      setNotice('프리랜서 프로필을 저장했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프리랜서 프로필 저장에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleAvatarFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => setPendingAvatar(reader.result as string);
-    reader.readAsDataURL(file);
+  async function handlePortfolioUpload(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await uploadMyFreelancerFile(file);
+      await refreshFreelancerWorkspace();
+      setNotice('포트폴리오 파일을 업로드했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '포트폴리오 업로드에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleAvatarSave() {
-    if (!user) return;
-    const updatedUser = { ...user, avatar: pendingAvatar };
-    setUser(updatedUser);
-    setCurrentUser(updatedUser);
-    setShowAvatarModal(false);
+  async function handlePortfolioDelete(fileId: number) {
+    setSaving(true);
+    setError('');
+
+    try {
+      await deleteMyFreelancerFile(fileId);
+      await refreshFreelancerWorkspace();
+      setNotice('포트폴리오 파일을 삭제했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '포트폴리오 파일 삭제에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function openAvatarModal() {
-    setPendingAvatar(user?.avatar);
-    setShowAvatarModal(true);
+  async function handleCreateVerification() {
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const created = await createMyVerification({
+        type: newVerificationType,
+        requestMessage: newVerificationMessage.trim() || undefined,
+      });
+      setSelectedVerificationId(created.verificationId);
+      setNewVerificationMessage('');
+      await refreshFreelancerWorkspace();
+      await handleVerificationSelect(created.verificationId, true);
+      setNotice('인증 요청을 등록했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 요청 등록에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleVerify(requestId: number, action: 'APPROVED' | 'REJECTED') {
+  async function handleVerificationSelect(verificationId: number, forceOpen = false) {
+    if (!forceOpen && selectedVerificationId === verificationId) {
+      setSelectedVerificationId(null);
+      setSelectedVerification(null);
+      setSelectedVerificationFiles([]);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const [verification, files] = await Promise.all([
+        getMyVerification(verificationId),
+        getVerificationFiles(verificationId),
+      ]);
+
+      setSelectedVerificationId(verificationId);
+      setSelectedVerification(verification);
+      setSelectedVerificationFiles(files);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 요청 상세를 불러오지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleVerificationFileUpload(file: File | null) {
+    if (!file || !selectedVerificationId) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await uploadVerificationFile(selectedVerificationId, file);
+      await handleVerificationSelect(selectedVerificationId, true);
+      await refreshFreelancerWorkspace();
+      setNotice('인증 파일을 업로드했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 파일 업로드에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleVerificationFileDelete(fileId: number) {
+    if (!selectedVerificationId) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await deleteVerificationFile(fileId);
+      await handleVerificationSelect(selectedVerificationId, true);
+      await refreshFreelancerWorkspace();
+      setNotice('인증 파일을 삭제했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 파일 삭제에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function handleEditTagToggle(tagCode: string) {
+    setEditTagCodes((current) => toggleSelection(current, tagCode));
+  }
+
+  async function handleReviewUpdate(reviewId: number) {
+    const target = reviews.find((review) => review.reviewId === reviewId);
+    if (!target || !canModifyOwnReview(user, { reviewerUserId: target.reviewerUserId })) {
+      window.location.href = '/error?code=403';
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await updateMyReview(reviewId, {
+        rating: editRating,
+        tagCodes: editTagCodes,
+        content: editContent,
+      });
+
+      setEditingReviewId(null);
+      await refreshProfileSummary();
+      setNotice('리뷰를 수정했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '리뷰 수정에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleReviewDelete(reviewId: number) {
+    const target = reviews.find((review) => review.reviewId === reviewId);
+    if (!target || !canModifyOwnReview(user, { reviewerUserId: target.reviewerUserId })) {
+      window.location.href = '/error?code=403';
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await deleteMyReview(reviewId);
+      setEditingReviewId(null);
+      await refreshProfileSummary();
+      setNotice('리뷰를 삭제했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '리뷰 삭제에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSelectAdminFreelancer(freelancerProfileId: number) {
+    if (selectedAdminFreelancer?.freelancerProfileId === freelancerProfileId) {
+      setSelectedAdminFreelancer(null);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const detail = await getAdminFreelancer(freelancerProfileId);
+      setSelectedAdminFreelancer(detail);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프리랜서 상세를 불러오지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleAdminFreelancerVisibility(freelancerProfileId: number, publicYn: boolean) {
+    setSaving(true);
+    setError('');
+
+    try {
+      await updateAdminFreelancerVisibility(freelancerProfileId, !publicYn);
+      await refreshAdminData();
+      if (selectedAdminFreelancer?.freelancerProfileId === freelancerProfileId) {
+        const detail = await getAdminFreelancer(freelancerProfileId);
+        setSelectedAdminFreelancer(detail);
+      }
+      setNotice('프리랜서 공개 여부를 변경했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프리랜서 공개 여부 변경에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleToggleAdminFreelancerActive(freelancerProfileId: number, activeYn: boolean) {
+    setSaving(true);
+    setError('');
+
+    try {
+      await updateAdminFreelancerActive(freelancerProfileId, !activeYn);
+      await refreshAdminData();
+      if (selectedAdminFreelancer?.freelancerProfileId === freelancerProfileId) {
+        const detail = await getAdminFreelancer(freelancerProfileId);
+        setSelectedAdminFreelancer(detail);
+      }
+      setNotice('프리랜서 활성 상태를 변경했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프리랜서 활성 상태 변경에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSelectAdminProject(projectId: number) {
+    if (selectedAdminProject?.projectId === projectId) {
+      setSelectedAdminProject(null);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const detail = await getAdminProject(projectId);
+      setSelectedAdminProject(detail);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 상세를 불러오지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCancelAdminProject(projectId: number) {
+    const reason = window.prompt('취소 사유를 입력하세요.');
+    if (!reason?.trim()) {
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await cancelAdminProject(projectId, reason.trim());
+      await refreshAdminData();
+      if (selectedAdminProject?.projectId === projectId) {
+        const detail = await getAdminProject(projectId);
+        setSelectedAdminProject(detail);
+      }
+      setNotice('프로젝트를 취소했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 취소에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleSelectAdminVerification(verificationId: number) {
+    if (selectedAdminVerification?.verificationId === verificationId) {
+      setSelectedAdminVerification(null);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const detail = await getAdminVerification(verificationId);
+      setSelectedAdminVerification(detail);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 요청 상세를 불러오지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleApproveVerification(verificationId: number) {
     if (!canManageVerification(user)) {
       window.location.href = '/error?code=403';
       return;
     }
 
-    const nextRequests = verifyRequests.map((r) => r.id === requestId ? { ...r, status: action } : r);
-    setVerifyRequests(nextRequests);
+    setSaving(true);
+    setError('');
 
-    const target = nextRequests.find((r) => r.id === requestId);
-    if (target) {
-      updateUserRecord(target.freelancerEmail, {
-        basicVerifyStatus: action,
-        verified: action === 'APPROVED',
-      });
-      createNotification({
-        userEmail: target.freelancerEmail,
-        type: 'FREELANCER_STATUS',
-        title: action === 'APPROVED' ? '검증 요청이 승인되었습니다' : '검증 요청이 반려되었습니다',
-        message: `${target.freelancerName}님의 검증 요청 처리 결과가 반영되었습니다.`,
-        link: '/mypage?tab=certify',
-      });
+    try {
+      await approveAdminVerification(verificationId);
+      await refreshAdminData();
+      setSelectedAdminVerification(null);
+      setNotice('인증 요청을 승인했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 승인에 실패했습니다.'));
+    } finally {
+      setSaving(false);
     }
   }
 
-  function startEditReview(review: ReviewRecord) {
-    setEditingReviewId(review.id);
-    setEditRating(review.rating);
-    setEditTags(review.tags);
-    setEditContent(review.content);
-  }
-
-  function handleEditTagToggle(tag: string) {
-    setEditTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]);
-  }
-
-  function handleReviewUpdate(reviewId: number) {
-    const target = reviews.find((r) => r.id === reviewId);
-    if (!target || !canModifyOwnReview(user, target)) {
+  async function handleRejectVerification(verificationId: number) {
+    if (!canManageVerification(user)) {
       window.location.href = '/error?code=403';
       return;
     }
-    updateReview(reviewId, { rating: editRating, tags: editTags, content: editContent });
-    setEditingReviewId(null);
-    refreshPageData(user);
-  }
 
-  function handleReviewDelete(reviewId: number) {
-    const target = reviews.find((r) => r.id === reviewId);
-    if (!target || !canModifyOwnReview(user, target)) {
-      window.location.href = '/error?code=403';
+    const reviewComment = window.prompt('반려 사유를 입력하세요.');
+    if (!reviewComment?.trim()) {
       return;
     }
-    deleteReview(reviewId);
-    setEditingReviewId(null);
-    refreshPageData(user);
+
+    setSaving(true);
+    setError('');
+
+    try {
+      await rejectAdminVerification(verificationId, reviewComment.trim());
+      await refreshAdminData();
+      setSelectedAdminVerification(null);
+      setNotice('인증 요청을 반려했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '인증 반려에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleBlindToggle(reviewId: number) {
+  async function handleAdminBlindToggle(reviewId: number, blindedYn: boolean) {
     if (!canModerateReviews(user)) {
       window.location.href = '/error?code=403';
       return;
     }
-    toggleReviewBlind(reviewId);
-    refreshPageData(user);
+
+    setSaving(true);
+    setError('');
+
+    try {
+      if (blindedYn) {
+        await unblindAdminReview(reviewId);
+      } else {
+        const reason = window.prompt('블라인드 사유를 입력하세요.')?.trim() || '관리자 조치';
+        await blindAdminReview(reviewId, reason);
+      }
+
+      await refreshAdminData();
+      setNotice('리뷰 노출 상태를 변경했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '리뷰 상태 변경에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
 
-  function handleReportClear(reviewId: number) {
-    if (!canModerateReviews(user)) {
-      window.location.href = '/error?code=403';
+  async function handleSelectAdminReport(reportId: number) {
+    if (selectedAdminReport?.reportId === reportId) {
+      setSelectedAdminReport(null);
       return;
     }
-    clearReviewReport(reviewId);
-    refreshPageData(user);
+
+    setSaving(true);
+    setError('');
+
+    try {
+      const detail = await getAdminReport(reportId);
+      setSelectedAdminReport(detail);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '신고 상세를 불러오지 못했습니다.'));
+    } finally {
+      setSaving(false);
+    }
   }
+
+  async function handleResolveAdminReport(reportId: number) {
+    setSaving(true);
+    setError('');
+
+    try {
+      await resolveAdminReport(reportId);
+      await refreshAdminData();
+      setSelectedAdminReport(null);
+      setNotice('신고를 승인 처리했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '신고 승인 처리에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleRejectAdminReport(reportId: number) {
+    setSaving(true);
+    setError('');
+
+    try {
+      await rejectAdminReport(reportId);
+      await refreshAdminData();
+      setSelectedAdminReport(null);
+      setNotice('신고를 반려 처리했습니다.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '신고 반려 처리에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (!user || loading) {
+    return (
+      <div className="mypage">
+        <AppHeader activePage="mypage" />
+        <main className="mypage-content">
+          <p className="empty-msg">마이페이지를 준비하는 중입니다.</p>
+        </main>
+      </div>
+    );
+  }
+
+  const isAdmin = user.role === 'ROLE_ADMIN';
+  const isFreelancer = user.role === 'ROLE_FREELANCER';
 
   return (
     <div className="mypage">
@@ -292,51 +923,42 @@ export default function MyPage2() {
 
       <main className="mypage-content">
         <div className="profile-section">
-          <button type="button" className="avatar-wrap" onClick={openAvatarModal} aria-label="프로필 사진 변경">
-            {user.avatar
-              ? <img src={user.avatar} alt="profile" className="avatar-img" />
-              : <span className="avatar-initial">{user.name[0].toUpperCase()}</span>
-            }
-            <div className="avatar-overlay">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                <circle cx="12" cy="13" r="4"/>
-              </svg>
-              <span>사진 변경</span>
-            </div>
-          </button>
+          <div className="avatar-wrap">
+            <span className="avatar-initial">{user.name[0].toUpperCase()}</span>
+          </div>
           <div className="profile-info">
             <h1 className="username">{user.name}</h1>
             <p className="email">{user.email}</p>
             <div className="profile-badges">
-              <span className={`role-badge role-badge--${user.role.toLowerCase().replace('role_', '')}`}>
-                {user.role}
-              </span>
-              {isFreelancer && user.basicVerifyStatus === 'APPROVED' && (
-                <span className="verified-badge">✦ 검증됨</span>
-              )}
+              <span className={`role-badge role-badge--${user.role.toLowerCase().replace('role_', '')}`}>{user.role}</span>
+              {summary?.freelancerProfile?.verifiedYn && <span className="verified-badge">인증 프로필</span>}
             </div>
           </div>
         </div>
 
+        {error && <p className="login-error">{error}</p>}
+        {notice && <p className="login-success">{notice}</p>}
+
         <div className="tab-bar">
           {!isAdmin && (
             <>
-              <button className={`tab-btn${activeTab === 'account' ? ' active' : ''}`} onClick={() => setActiveTab('account')}>계정 정보</button>
-              <button className={`tab-btn${activeTab === 'reviews' ? ' active' : ''}`} onClick={() => setActiveTab('reviews')}>리뷰 내역</button>
+              <button className={`tab-btn${activeTab === 'account' ? ' active' : ''}`} onClick={() => handleTabChange('account')}>계정 정보</button>
+              <button className={`tab-btn${activeTab === 'reviews' ? ' active' : ''}`} onClick={() => handleTabChange('reviews')}>리뷰</button>
+              <button className={`tab-btn${activeTab === 'reports' ? ' active' : ''}`} onClick={() => handleTabChange('reports')}>신고</button>
               {isFreelancer && (
-                <button className={`tab-btn${activeTab === 'certify' ? ' active' : ''}`} onClick={() => setActiveTab('certify')}>인증 요청</button>
+                <button className={`tab-btn${activeTab === 'certify' ? ' active' : ''}`} onClick={() => handleTabChange('certify')}>인증/포트폴리오</button>
               )}
             </>
           )}
+
           {isAdmin && (
             <>
-              <button className={`tab-btn${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => setActiveTab('dashboard')}>대시보드</button>
-              <button className={`tab-btn${activeTab === 'freelancers' ? ' active' : ''}`} onClick={() => setActiveTab('freelancers')}>메이트 관리</button>
-              <button className={`tab-btn${activeTab === 'projects' ? ' active' : ''}`} onClick={() => setActiveTab('projects')}>프로젝트 관리</button>
-              <button className={`tab-btn${activeTab === 'verify' ? ' active' : ''}`} onClick={() => setActiveTab('verify')}>검증 처리</button>
-              <button className={`tab-btn${activeTab === 'reports' ? ' active' : ''}`} onClick={() => setActiveTab('reports')}>리뷰/신고 처리</button>
-              <button className={`tab-btn${activeTab === 'usage-report' ? ' active' : ''}`} onClick={() => setActiveTab('usage-report')}>이용 통계</button>
+              <button className={`tab-btn${activeTab === 'dashboard' ? ' active' : ''}`} onClick={() => handleTabChange('dashboard')}>대시보드</button>
+              <button className={`tab-btn${activeTab === 'freelancers' ? ' active' : ''}`} onClick={() => handleTabChange('freelancers')}>프리랜서</button>
+              <button className={`tab-btn${activeTab === 'projects' ? ' active' : ''}`} onClick={() => handleTabChange('projects')}>프로젝트</button>
+              <button className={`tab-btn${activeTab === 'verify' ? ' active' : ''}`} onClick={() => handleTabChange('verify')}>인증 심사</button>
+              <button className={`tab-btn${activeTab === 'reports' ? ' active' : ''}`} onClick={() => handleTabChange('reports')}>리뷰/신고</button>
+              <button className={`tab-btn${activeTab === 'usage-report' ? ' active' : ''}`} onClick={() => handleTabChange('usage-report')}>운영 리포트</button>
             </>
           )}
         </div>
@@ -345,59 +967,133 @@ export default function MyPage2() {
           <div className="account-card">
             <div className="account-card-head">
               <h2>계정 정보</h2>
-              {!editingAccount && (
-                <button className="btn-edit" onClick={() => { setEditName(user.name); setBio(user.bio ?? ''); setEditingAccount(true); }}>
-                  수정하기
-                </button>
-              )}
+              <button className="btn-edit" onClick={() => void handleAccountSave()} disabled={saving}>저장</button>
             </div>
 
-            {editingAccount ? (
-              <div className="account-edit-form">
-                <div className="account-field">
-                  <label>이름</label>
-                  <input
-                    className="account-input"
-                    type="text"
-                    value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
-                    placeholder="이름을 입력하세요"
-                  />
+            <div className="account-edit-form">
+              <div className="account-field">
+                <label>이름</label>
+                <input className="account-input" value={profileForm.name} onChange={(event) => setProfileForm((current) => ({ ...current, name: event.target.value }))} />
+              </div>
+              <div className="account-field account-field--readonly">
+                <label>이메일</label>
+                <span>{user.email}</span>
+              </div>
+              <div className="account-field">
+                <label>전화번호</label>
+                <input className="account-input" value={profileForm.phone} onChange={(event) => setProfileForm((current) => ({ ...current, phone: event.target.value }))} />
+              </div>
+              <div className="account-field">
+                <label>소개</label>
+                <textarea className="account-textarea" rows={4} value={profileForm.intro} onChange={(event) => setProfileForm((current) => ({ ...current, intro: event.target.value }))} />
+              </div>
+            </div>
+
+            {summary && (
+              <div className="admin-grid" style={{ marginTop: '1.5rem' }}>
+                <div className="metric-card">
+                  <span className="metric-label">총 프로젝트</span>
+                  <strong className="metric-value">{summary.projectStats.totalProjects}</strong>
                 </div>
-                <div className="account-field account-field--readonly">
-                  <label>이메일</label>
-                  <span>{user.email}</span>
+                <div className="metric-card">
+                  <span className="metric-label">완료 프로젝트</span>
+                  <strong className="metric-value">{summary.projectStats.completedProjects}</strong>
                 </div>
-                <div className="account-field account-field--readonly">
-                  <label>역할</label>
-                  <span>{user.role}</span>
+                <div className="metric-card">
+                  <span className="metric-label">작성 리뷰</span>
+                  <strong className="metric-value">{summary.reviewStats.writtenReviewCount}</strong>
                 </div>
-                <div className="account-field">
-                  <label>자기소개</label>
-                  <textarea
-                    className="account-textarea"
-                    value={bio}
-                    onChange={(e) => setBio(e.target.value)}
-                    rows={4}
-                    placeholder="자기소개를 작성해 주세요."
-                  />
-                </div>
-                <div className="account-edit-actions">
-                  <button className="btn-edit" onClick={handleAccountSave}>저장</button>
-                  <button className="btn-cancel" onClick={handleAccountCancel}>취소</button>
+                <div className="metric-card">
+                  <span className="metric-label">미읽음 알림</span>
+                  <strong className="metric-value">{summary.notificationSummary.unreadNotificationCount}</strong>
                 </div>
               </div>
-            ) : (
-              <ul className="account-info-list">
-                <li><span>이름</span><span>{user.name}</span></li>
-                <li><span>이메일</span><span>{user.email}</span></li>
-                <li><span>역할</span><span>{user.role}</span></li>
-                <li><span>가입일</span><span>2025.01.01</span></li>
-                <li className="account-bio-row">
-                  <span>자기소개</span>
-                  <span>{user.bio || '—'}</span>
-                </li>
-              </ul>
+            )}
+
+            {isFreelancer && (
+              <div className="account-card" style={{ marginTop: '1.5rem' }}>
+                <div className="account-card-head">
+                  <h2>프리랜서 프로필</h2>
+                  <button className="btn-edit" onClick={() => void handleFreelancerProfileSave()} disabled={saving}>저장</button>
+                </div>
+
+                <div className="account-edit-form">
+                  <div className="account-field">
+                    <label>경력 설명</label>
+                    <textarea
+                      className="account-textarea"
+                      rows={4}
+                      value={freelancerForm.careerDescription}
+                      onChange={(event) => setFreelancerForm((current) => ({ ...current, careerDescription: event.target.value }))}
+                    />
+                  </div>
+                  <div className="account-field">
+                    <label>공개 설정</label>
+                    <div className="type-selector">
+                      <button type="button" className={`type-btn${freelancerForm.publicYn ? ' selected' : ''}`} onClick={() => setFreelancerForm((current) => ({ ...current, publicYn: !current.publicYn }))}>
+                        {freelancerForm.publicYn ? '공개중' : '비공개'}
+                      </button>
+                      <button type="button" className={`type-btn${freelancerForm.caregiverYn ? ' selected' : ''}`} onClick={() => setFreelancerForm((current) => ({ ...current, caregiverYn: !current.caregiverYn }))}>
+                        {freelancerForm.caregiverYn ? '요양보호사' : '일반 활동자'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>활동 지역</label>
+                    <div className="type-selector">
+                      {regionOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${freelancerForm.activityRegionCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setFreelancerForm((current) => ({
+                            ...current,
+                            activityRegionCodes: toggleSelection(current.activityRegionCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>가능 시간대</label>
+                    <div className="type-selector">
+                      {timeSlotOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${freelancerForm.availableTimeSlotCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setFreelancerForm((current) => ({
+                            ...current,
+                            availableTimeSlotCodes: toggleSelection(current.availableTimeSlotCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>서비스 유형</label>
+                    <div className="type-selector">
+                      {projectTypeOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${freelancerForm.projectTypeCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setFreelancerForm((current) => ({
+                            ...current,
+                            projectTypeCodes: toggleSelection(current.projectTypeCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -405,64 +1101,166 @@ export default function MyPage2() {
         {activeTab === 'reviews' && !isAdmin && (
           <ReviewsTab
             reviews={reviews}
-            isFreelancer={isFreelancer}
             editingReviewId={editingReviewId}
             editRating={editRating}
-            editTags={editTags}
+            editTagCodes={editTagCodes}
             editContent={editContent}
-            reviewTags={REVIEW_TAGS}
+            reviewTags={reviewTags}
+            canEdit
             setEditingReviewId={setEditingReviewId}
             setEditRating={setEditRating}
             setEditContent={setEditContent}
             handleEditTagToggle={handleEditTagToggle}
-            handleReviewUpdate={handleReviewUpdate}
-            handleReviewDelete={handleReviewDelete}
+            handleReviewUpdate={(reviewId) => void handleReviewUpdate(reviewId)}
+            handleReviewDelete={(reviewId) => void handleReviewDelete(reviewId)}
             startEditReview={startEditReview}
           />
         )}
 
+        {activeTab === 'reports' && !isAdmin && (
+          <ReportsTab mode="user" reports={reports} />
+        )}
+
         {activeTab === 'certify' && isFreelancer && (
           <div className="tab-content">
-            <ul className="verify-list">
-              {verifyRequests
-                .filter((r) => r.freelancerEmail === user.email)
-                .map((request) => (
-                  <li key={request.id} className="verify-item">
-                    <div className="verify-info">
-                      <div className="verify-name">{request.freelancerName}</div>
-                      <div className="verify-skills">
-                        {request.skills.map((skill) => <span key={skill} className="skill-tag">{skill}</span>)}
+            <div className="account-card">
+              <div className="account-card-head">
+                <h2>포트폴리오</h2>
+                <label className="btn-edit">
+                  파일 업로드
+                  <input hidden type="file" onChange={(event) => void handlePortfolioUpload(event.target.files?.[0] ?? null)} />
+                </label>
+              </div>
+              {portfolioFiles.length === 0 ? (
+                <p className="empty-msg">등록된 포트폴리오 파일이 없습니다.</p>
+              ) : (
+                <ul className="admin-list">
+                  {portfolioFiles.map((file) => (
+                    <li key={file.fileId} className="admin-item">
+                      <div>
+                        <strong>{file.originalFilename}</strong>
+                        <p className="admin-subtext">{formatDateTime(file.uploadedAt)}</p>
                       </div>
+                      <div className="admin-item-right">
+                        <a className="btn-edit" href={resolveApiAssetUrl(file.viewUrl)} target="_blank" rel="noreferrer">보기</a>
+                        <a className="btn-edit" href={resolveApiAssetUrl(file.downloadUrl)}>다운로드</a>
+                        <button className="btn-cancel" onClick={() => void handlePortfolioDelete(file.fileId)}>삭제</button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            <div className="account-card" style={{ marginTop: '1.5rem' }}>
+              <div className="account-card-head">
+                <h2>인증 요청</h2>
+                <button className="btn-edit" onClick={() => void handleCreateVerification()} disabled={saving}>등록</button>
+              </div>
+              <div className="account-edit-form">
+                <div className="account-field">
+                  <label>인증 유형</label>
+                  <select className="account-input" value={newVerificationType} onChange={(event) => setNewVerificationType(event.target.value as VerificationType)}>
+                    <option value="BASIC_IDENTITY">기본 신원</option>
+                    <option value="LICENSE">자격증</option>
+                    <option value="CAREGIVER">요양보호사</option>
+                  </select>
+                </div>
+                <div className="account-field">
+                  <label>요청 메시지</label>
+                  <textarea className="account-textarea" rows={4} value={newVerificationMessage} onChange={(event) => setNewVerificationMessage(event.target.value)} />
+                </div>
+              </div>
+
+              <ul className="verify-list">
+                {verifications.map((verification) => (
+                  <li key={verification.verificationId} className="verify-item">
+                    <div className="verify-info">
+                      <div className="verify-name">{verification.type}</div>
+                      <div className="verify-email">{formatDateTime(verification.requestedAt)}</div>
                     </div>
                     <div className="verify-right">
-                      <span className="verify-date">{request.requestedAt}</span>
-                      <span className={`verify-status verify-status--${request.status.toLowerCase()}`}>
-                        {STATUS_LABEL[request.status]}
-                      </span>
+                      <span className={`verify-status verify-status--${verification.status.toLowerCase()}`}>{verification.status}</span>
+                      <button className="verify-btn verify-btn--detail" onClick={() => void handleVerificationSelect(verification.verificationId)}>
+                        {selectedVerificationId === verification.verificationId ? '닫기' : '상세'}
+                      </button>
                     </div>
                   </li>
                 ))}
-            </ul>
+                {verifications.length === 0 && <p className="empty-msg">등록된 인증 요청이 없습니다.</p>}
+              </ul>
+            </div>
+
+            {selectedVerification && (
+              <div className="account-card" style={{ marginTop: '1.5rem' }}>
+                <div className="account-card-head">
+                  <h2>인증 파일 관리</h2>
+                  <label className="btn-edit">
+                    파일 업로드
+                    <input hidden type="file" onChange={(event) => void handleVerificationFileUpload(event.target.files?.[0] ?? null)} />
+                  </label>
+                </div>
+                <ul className="account-info-list">
+                  <li><span>유형</span><span>{selectedVerification.type}</span></li>
+                  <li><span>상태</span><span>{selectedVerification.status}</span></li>
+                  <li><span>요청일</span><span>{formatDateTime(selectedVerification.requestedAt)}</span></li>
+                  <li><span>반려 사유</span><span>{selectedVerification.rejectReason || '-'}</span></li>
+                </ul>
+                {selectedVerificationFiles.length === 0 ? (
+                  <p className="empty-msg">첨부 파일이 없습니다.</p>
+                ) : (
+                  <ul className="admin-list">
+                    {selectedVerificationFiles.map((file) => (
+                      <li key={file.verificationFileId} className="admin-item">
+                        <div>
+                          <strong>{file.originalFilename}</strong>
+                          <p className="admin-subtext">{formatDateTime(file.uploadedAt)}</p>
+                        </div>
+                        <div className="admin-item-right">
+                          <a className="btn-edit" href={resolveApiAssetUrl(file.viewUrl)} target="_blank" rel="noreferrer">보기</a>
+                          <a className="btn-edit" href={resolveApiAssetUrl(file.downloadUrl)}>다운로드</a>
+                          <button className="btn-cancel" onClick={() => void handleVerificationFileDelete(file.verificationFileId)}>삭제</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
           </div>
         )}
 
-        {activeTab === 'dashboard' && isAdmin && (
-          <div className="admin-grid">
-            <div className="metric-card">
-              <span className="metric-label">메이트</span>
-              <strong className="metric-value">{adminMetrics.freelancerCount}</strong>
+        {activeTab === 'dashboard' && isAdmin && adminDashboard && (
+          <div className="tab-content">
+            <div className="admin-grid">
+              <div className="metric-card">
+                <span className="metric-label">전체 사용자</span>
+                <strong className="metric-value">{adminDashboard.totalUsers}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">프리랜서</span>
+                <strong className="metric-value">{adminDashboard.totalFreelancers}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">대기 검증</span>
+                <strong className="metric-value">{adminDashboard.pendingVerifications}</strong>
+              </div>
+              <div className="metric-card">
+                <span className="metric-label">미처리 신고</span>
+                <strong className="metric-value">{adminDashboard.pendingReports}</strong>
+              </div>
             </div>
-            <div className="metric-card">
-              <span className="metric-label">진행 프로젝트</span>
-              <strong className="metric-value">{adminMetrics.activeProjects}</strong>
-            </div>
-            <div className="metric-card">
-              <span className="metric-label">대기 검증</span>
-              <strong className="metric-value">{adminMetrics.pendingVerify}</strong>
-            </div>
-            <div className="metric-card">
-              <span className="metric-label">신고 리뷰</span>
-              <strong className="metric-value">{adminMetrics.reportedReviewCount}</strong>
+
+            <div className="admin-list" style={{ marginTop: '1.5rem' }}>
+              {adminDashboard.recentProjects.map((project) => (
+                <div key={project.projectId} className="admin-item">
+                  <div>
+                    <strong>{project.title}</strong>
+                    <p className="admin-subtext">작성자 {project.ownerName}</p>
+                  </div>
+                  <span className="admin-subtext">{project.status}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -470,110 +1268,114 @@ export default function MyPage2() {
         {activeTab === 'freelancers' && isAdmin && (
           <div className="tab-content">
             <ul className="admin-list">
-              {freelancerSummaries.map((freelancer) => (
-                <li key={freelancer.id} className="admin-item">
+              {adminFreelancers.map((freelancer) => (
+                <li key={freelancer.freelancerProfileId} className="admin-item">
                   <div>
                     <strong>{freelancer.name}</strong>
-                    <p className="admin-subtext">{freelancer.skills.join(' · ')}</p>
+                    <p className="admin-subtext">{freelancer.email}</p>
                   </div>
                   <div className="admin-item-right">
-                    <span className="skill-tag">
-                      {freelancer.basicVerifyStatus === 'APPROVED' ? '검증 완료'
-                        : freelancer.basicVerifyStatus === 'PENDING' ? '검증 대기'
-                        : freelancer.basicVerifyStatus === 'REJECTED' ? '반려됨'
-                        : '미검증'}
-                    </span>
-                    <span className="admin-subtext">평점 {freelancer.rating.toFixed(1)} / 리뷰 {freelancer.reviewCount}개</span>
+                    <span className="skill-tag">{freelancer.verifiedYn ? '검증완료' : '미검증'}</span>
+                    <button className="btn-edit" onClick={() => void handleSelectAdminFreelancer(freelancer.freelancerProfileId)}>상세</button>
+                    <button className="btn-edit" onClick={() => void handleToggleAdminFreelancerVisibility(freelancer.freelancerProfileId, freelancer.publicYn)}>
+                      {freelancer.publicYn ? '비공개' : '공개'}
+                    </button>
+                    <button className="btn-cancel" onClick={() => void handleToggleAdminFreelancerActive(freelancer.freelancerProfileId, freelancer.activeYn)}>
+                      {freelancer.activeYn ? '비활성' : '활성'}
+                    </button>
                   </div>
                 </li>
               ))}
             </ul>
+
+            {selectedAdminFreelancer && (
+              <div className="account-card" style={{ marginTop: '1.5rem' }}>
+                <h2>{selectedAdminFreelancer.name}</h2>
+                <ul className="account-info-list">
+                  <li><span>이메일</span><span>{selectedAdminFreelancer.email}</span></li>
+                  <li><span>공개 여부</span><span>{selectedAdminFreelancer.publicYn ? '공개' : '비공개'}</span></li>
+                  <li><span>활성 여부</span><span>{selectedAdminFreelancer.activeYn ? '활성' : '비활성'}</span></li>
+                  <li><span>평점</span><span>{selectedAdminFreelancer.averageRating ?? '-'}</span></li>
+                  <li><span>활동 지역</span><span>{selectedAdminFreelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)).join(', ') || '-'}</span></li>
+                  <li><span>가능 시간대</span><span>{selectedAdminFreelancer.availableTimeSlotCodes.map((code) => labelOf(timeSlotMap, code)).join(', ') || '-'}</span></li>
+                  <li><span>서비스 유형</span><span>{selectedAdminFreelancer.projectTypeCodes.map((code) => labelOf(projectTypeMap, code)).join(', ') || '-'}</span></li>
+                </ul>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'projects' && isAdmin && (
           <div className="tab-content">
             <ul className="admin-list">
-              {projects.map((project) => (
-                <li key={project.id} className="admin-item">
+              {adminProjects.map((project) => (
+                <li key={project.projectId} className="admin-item">
                   <div>
                     <strong>{project.title}</strong>
-                    <p className="admin-subtext">{project.requesterName} · {project.location}</p>
+                    <p className="admin-subtext">{project.owner.name} / {project.projectTypeCode}</p>
                   </div>
                   <div className="admin-item-right">
                     <span className="skill-tag">{project.status}</span>
-                    <span className="admin-subtext">{project.freelancerName ?? '담당자 미배정'}</span>
+                    <button className="btn-edit" onClick={() => void handleSelectAdminProject(project.projectId)}>상세</button>
+                    <button className="btn-cancel" onClick={() => void handleCancelAdminProject(project.projectId)}>취소</button>
                   </div>
                 </li>
               ))}
             </ul>
+
+            {selectedAdminProject && (
+              <div className="account-card" style={{ marginTop: '1.5rem' }}>
+                <h2>{selectedAdminProject.title}</h2>
+                <ul className="account-info-list">
+                  <li><span>상태</span><span>{selectedAdminProject.status}</span></li>
+                  <li><span>작성자</span><span>{selectedAdminProject.owner.name}</span></li>
+                  <li><span>지역</span><span>{labelOf(regionMap, selectedAdminProject.serviceRegionCode)}</span></li>
+                  <li><span>주소</span><span>{selectedAdminProject.serviceAddress}</span></li>
+                  <li><span>일정</span><span>{formatDateTime(selectedAdminProject.requestedStartAt)} ~ {formatDateTime(selectedAdminProject.requestedEndAt)}</span></li>
+                  <li><span>수락 프리랜서</span><span>{selectedAdminProject.acceptedProposal?.freelancer.name || '-'}</span></li>
+                  <li><span>취소 사유</span><span>{selectedAdminProject.cancelledReason || '-'}</span></li>
+                </ul>
+                <p className="review-content">{selectedAdminProject.requestDetail}</p>
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'verify' && isAdmin && (
           <VerifyTab
-            verifyRequests={verifyRequests}
+            verifications={adminVerifications}
             verifyFilter={verifyFilter}
             setVerifyFilter={setVerifyFilter}
-            filteredVerifyRequests={filteredVerifyRequests}
-            verifyDetailId={verifyDetailId}
-            setVerifyDetailId={setVerifyDetailId}
-            handleVerify={handleVerify}
+            selectedVerification={selectedAdminVerification}
+            onSelectVerification={(verificationId) => void handleSelectAdminVerification(verificationId)}
+            onApproveVerification={(verificationId) => void handleApproveVerification(verificationId)}
+            onRejectVerification={(verificationId) => void handleRejectVerification(verificationId)}
           />
         )}
 
         {activeTab === 'reports' && isAdmin && (
           <ReportsTab
-            reportedReviews={reportedReviews}
-            handleBlindToggle={handleBlindToggle}
-            handleReportClear={handleReportClear}
+            mode="admin"
+            reviews={adminReviews}
+            reports={adminReports}
+            selectedReport={selectedAdminReport}
+            onBlindToggle={(reviewId, blindedYn) => void handleAdminBlindToggle(reviewId, blindedYn)}
+            onSelectReport={(reportId) => void handleSelectAdminReport(reportId)}
+            onResolveReport={(reportId) => void handleResolveAdminReport(reportId)}
+            onRejectReport={(reportId) => void handleRejectAdminReport(reportId)}
           />
         )}
 
         {activeTab === 'usage-report' && isAdmin && (
           <UsageReportTab
-            projects={projects}
-            reviews={getReviews(true)}
-            proposals={proposals}
-            freelancers={freelancerSummaries}
+            dashboard={adminDashboard}
+            freelancers={adminFreelancers}
+            projects={adminProjects}
+            reviews={adminReviews}
+            reports={adminReports}
           />
         )}
       </main>
-
-      {showAvatarModal && (
-        <div className="avatar-modal-overlay" onClick={() => setShowAvatarModal(false)}>
-          <div className="avatar-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="avatar-modal-head">
-              <h2>프로필 사진</h2>
-              <button type="button" className="avatar-modal-close" onClick={() => setShowAvatarModal(false)}>✕</button>
-            </div>
-
-            <div className="avatar-modal-preview">
-              {pendingAvatar
-                ? <img src={pendingAvatar} alt="preview" className="avatar-modal-img" />
-                : <span className="avatar-modal-initial">{user.name[0].toUpperCase()}</span>
-              }
-            </div>
-
-            <div className="avatar-modal-actions">
-              <label className="avatar-modal-upload">
-                사진 업로드
-                <input type="file" accept="image/*" hidden onChange={handleAvatarFileChange} />
-              </label>
-              {pendingAvatar && (
-                <button type="button" className="avatar-modal-remove" onClick={() => setPendingAvatar(undefined)}>
-                  사진 삭제
-                </button>
-              )}
-            </div>
-
-            <div className="avatar-modal-footer">
-              <button type="button" className="avatar-modal-cancel" onClick={() => setShowAvatarModal(false)}>취소</button>
-              <button type="button" className="avatar-modal-save" onClick={handleAvatarSave}>저장</button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

@@ -4,13 +4,11 @@ import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
 import { canSendAnnouncement } from '../store/accessControl';
 import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 import {
-  type AppNotification,
-  NOTIFICATION_EVENT,
-  formatNotificationTime,
-  getNotificationsForUser,
-  markAllNotificationsAsRead,
+  getNotifications,
+  markAllNotificationsRead,
   markNotificationRead,
-} from '../store/notificationStore';
+  type NotificationSummaryResponse,
+} from '../api/notifications';
 
 interface HeaderProps {
   activePage?: string;
@@ -31,33 +29,85 @@ function ThemeIcon({ theme }: { theme: AppTheme }) {
   return <span aria-hidden="true">{theme === 'dark' ? '☀' : '☾'}</span>;
 }
 
+function formatNotificationTime(createdAt: string): string {
+  return new Intl.DateTimeFormat('ko-KR', {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(createdAt));
+}
+
+function getNotificationLink(notification: NotificationSummaryResponse): string | null {
+  switch (notification.notificationType) {
+    case 'NOTICE':
+      return notification.relatedNoticeId ? `/announcement?noticeId=${notification.relatedNoticeId}` : '/announcement';
+    case 'VERIFICATION_APPROVED':
+    case 'VERIFICATION_REJECTED':
+      return '/mypage?tab=certify';
+    case 'PROPOSAL_RECEIVED':
+    case 'PROPOSAL_ACCEPTED':
+      return notification.relatedProjectId ? `/project?projectId=${notification.relatedProjectId}` : '/project';
+    case 'PROJECT_STATUS_CHANGED':
+    case 'REVIEW_REQUEST':
+      return notification.relatedProjectId ? `/project?projectId=${notification.relatedProjectId}` : '/project';
+    default:
+      return null;
+  }
+}
+
+function getNotificationMeta(notification: NotificationSummaryResponse): string {
+  if (!notification.isRead) {
+    return '읽지 않음';
+  }
+
+  const link = getNotificationLink(notification);
+  return link ? '관련 화면으로 이동' : '읽음';
+}
+
 export default function AppHeader({ activePage }: HeaderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [theme, setThemeState] = useState<AppTheme>('dark');
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifications, setNotifications] = useState<NotificationSummaryResponse[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notificationOpen, setNotificationOpen] = useState(false);
   const actionsRef = useRef<HTMLDivElement>(null);
+
+  async function refreshNotifications(nextUser: User | null): Promise<void> {
+    if (!nextUser) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    try {
+      const response = await getNotifications({ page: 0, size: 20 });
+      setNotifications(response.content);
+      setUnreadCount(response.unreadCount);
+    } catch {
+      setNotifications([]);
+      setUnreadCount(0);
+    }
+  }
 
   useEffect(() => {
     const syncHeaderState = () => {
       const nextUser = getUser();
       setUser(nextUser);
       setThemeState(getTheme());
-      setNotifications(getNotificationsForUser(nextUser?.email));
+      void refreshNotifications(nextUser);
     };
 
     syncHeaderState();
-    window.addEventListener(NOTIFICATION_EVENT, syncHeaderState as EventListener);
     window.addEventListener(THEME_EVENT, syncHeaderState as EventListener);
     window.addEventListener(AUTH_USER_EVENT, syncHeaderState as EventListener);
-    window.addEventListener('storage', syncHeaderState);
+    window.addEventListener('focus', syncHeaderState);
 
     return () => {
-      window.removeEventListener(NOTIFICATION_EVENT, syncHeaderState as EventListener);
       window.removeEventListener(THEME_EVENT, syncHeaderState as EventListener);
       window.removeEventListener(AUTH_USER_EVENT, syncHeaderState as EventListener);
-      window.removeEventListener('storage', syncHeaderState);
+      window.removeEventListener('focus', syncHeaderState);
     };
   }, []);
 
@@ -73,16 +123,18 @@ export default function AppHeader({ activePage }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const unreadCount = notifications.filter((notification) => !notification.read).length;
-
   function handleLogout() {
     logout();
     window.location.href = '/';
   }
 
   function handleNotificationToggle() {
-    setNotificationOpen((open) => !open);
+    const nextOpen = !notificationOpen;
+    setNotificationOpen(nextOpen);
     setDropdownOpen(false);
+    if (nextOpen) {
+      void refreshNotifications(user);
+    }
   }
 
   function handleProfileToggle() {
@@ -90,31 +142,34 @@ export default function AppHeader({ activePage }: HeaderProps) {
     setNotificationOpen(false);
   }
 
-  function handleNotificationSelect(notification: AppNotification) {
-    if (!notification.read) {
-      markNotificationRead(notification.id);
+  async function handleNotificationSelect(notification: NotificationSummaryResponse) {
+    if (!notification.isRead) {
+      await markNotificationRead(notification.notificationId);
+      await refreshNotifications(user);
     }
 
     setNotificationOpen(false);
-    if (notification.link) {
-      const nextUrl = new URL(notification.link, window.location.origin);
+    const link = getNotificationLink(notification);
+    if (link) {
+      const nextUrl = new URL(link, window.location.origin);
       const currentUrl = new URL(window.location.href);
 
       if (nextUrl.pathname === currentUrl.pathname) {
         window.history.pushState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
         window.dispatchEvent(new PopStateEvent('popstate'));
       } else {
-        window.location.href = notification.link;
+        window.location.assign(link);
       }
     }
   }
 
-  function handleMarkAllAsRead() {
+  async function handleMarkAllAsRead() {
     if (!user) {
       return;
     }
 
-    markAllNotificationsAsRead(user.email);
+    await markAllNotificationsRead();
+    await refreshNotifications(user);
   }
 
   return (
@@ -172,24 +227,22 @@ export default function AppHeader({ activePage }: HeaderProps) {
                 </div>
 
                 {notifications.length === 0 ? (
-                  <p className="header-panel-empty">도착한 알림이 없습니다.</p>
+                  <p className="header-panel-empty">표시할 알림이 없습니다.</p>
                 ) : (
                   <div className="header-notification-list">
                     {notifications.map((notification) => (
                       <button
-                        key={notification.id}
+                        key={notification.notificationId}
                         type="button"
-                        className={`header-notification-item${notification.read ? '' : ' unread'}`}
-                        onClick={() => handleNotificationSelect(notification)}
+                        className={`header-notification-item${notification.isRead ? '' : ' unread'}`}
+                        onClick={() => void handleNotificationSelect(notification)}
                       >
                         <div className="header-notification-top">
                           <strong>{notification.title}</strong>
                           <span>{formatNotificationTime(notification.createdAt)}</span>
                         </div>
-                        <p className="header-notification-message">{notification.message}</p>
-                        <span className="header-notification-meta">
-                          {notification.link ? '관련 화면으로 이동' : notification.read ? '읽음' : '읽지 않음'}
-                        </span>
+                        <p className="header-notification-message">{notification.content}</p>
+                        <span className="header-notification-meta">{getNotificationMeta(notification)}</span>
                       </button>
                     ))}
                   </div>
@@ -212,7 +265,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
                     <a href="/project" className="header-dropdown-item">프로젝트</a>
                   )}
                   {canSendAnnouncement(user) && (
-                    <a href="/announcement" className="header-dropdown-item">공지 발송</a>
+                    <a href="/announcement" className="header-dropdown-item">공지 관리</a>
                   )}
                   <button type="button" className="header-dropdown-item danger" onClick={handleLogout}>로그아웃</button>
                 </div>

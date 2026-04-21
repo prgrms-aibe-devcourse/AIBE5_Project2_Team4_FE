@@ -1,111 +1,179 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import './announcement.css';
 import AppHeader from '../components/AppHeader';
 import { getUser } from '../store/appAuth';
 import { canSendAnnouncement } from '../store/accessControl';
-import {
-  sendAnnouncementWithOptions,
-  getAnnouncementHistory,
-  type AnnouncementTarget,
-  type AnnouncementType,
-  type AnnouncementRecord,
-} from '../store/notificationStore';
+import { createAdminNotice, publishAdminNotice, type AdminNoticeResponse } from '../api/admin';
+import { getNotice, getNotices, type NoticeDetailResponse, type NoticeSummaryResponse } from '../api/notices';
+import { getErrorMessage } from '../lib/errors';
+import { formatDateTime } from '../lib/referenceData';
 
-const TYPE_OPTIONS: { value: AnnouncementType; label: string; icon: string }[] = [
-  { value: 'GENERAL', label: '일반 공지', icon: '📢' },
-  { value: 'URGENT',  label: '긴급 공지', icon: '🚨' },
-  { value: 'SYSTEM',  label: '시스템 안내', icon: '⚙️' },
-  { value: 'EVENT',   label: '이벤트', icon: '🎉' },
-];
+function readNoticeId(): number | null {
+  const raw = new URLSearchParams(window.location.search).get('noticeId');
+  if (!raw) {
+    return null;
+  }
 
-const TARGET_OPTIONS: { value: AnnouncementTarget; label: string }[] = [
-  { value: 'ALL',              label: '전체' },
-  { value: 'ROLE_USER',        label: '보호자만' },
-  { value: 'ROLE_FREELANCER',  label: '메이트만' },
-];
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) ? parsed : null;
+}
 
-const TYPE_LABEL: Record<AnnouncementType, string> = {
-  GENERAL: '일반',
-  URGENT:  '긴급',
-  SYSTEM:  '시스템',
-  EVENT:   '이벤트',
-};
+function updateNoticeQuery(noticeId: number | null): void {
+  const nextUrl = new URL(window.location.href);
+  if (noticeId == null) {
+    nextUrl.searchParams.delete('noticeId');
+  } else {
+    nextUrl.searchParams.set('noticeId', String(noticeId));
+  }
 
-const TARGET_LABEL: Record<AnnouncementTarget, string> = {
-  ALL:             '전체',
-  ROLE_USER:       '보호자',
-  ROLE_FREELANCER: '메이트',
-};
-
-function formatDate(iso: string) {
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short', day: 'numeric',
-    hour: '2-digit', minute: '2-digit',
-  }).format(new Date(iso));
+  window.history.replaceState({}, '', `${nextUrl.pathname}${nextUrl.search}${nextUrl.hash}`);
 }
 
 export default function AnnouncementPage() {
-  const [annType, setAnnType] = useState<AnnouncementType>('GENERAL');
-  const [target, setTarget] = useState<AnnouncementTarget>('ALL');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [submitMessage, setSubmitMessage] = useState('');
+  const [publishError, setPublishError] = useState('');
+  const [notices, setNotices] = useState<NoticeSummaryResponse[]>([]);
+  const [selectedNoticeId, setSelectedNoticeId] = useState<number | null>(() => readNoticeId());
+  const [selectedNotice, setSelectedNotice] = useState<NoticeDetailResponse | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [draftNotice, setDraftNotice] = useState<AdminNoticeResponse | null>(null);
   const [title, setTitle] = useState('');
-  const [message, setMessage] = useState('');
-  const [scheduleMode, setScheduleMode] = useState<'now' | 'later'>('now');
-  const [scheduledAt, setScheduledAt] = useState('');
-  const [feedback, setFeedback] = useState('');
-  const [feedbackType, setFeedbackType] = useState<'ok' | 'error'>('ok');
-  const [history, setHistory] = useState<AnnouncementRecord[]>([]);
+  const [content, setContent] = useState('');
+  const [publishNow, setPublishNow] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isAdmin = canSendAnnouncement(getUser());
 
   useEffect(() => {
-    const user = getUser();
-    if (!user || !canSendAnnouncement(user)) {
-      window.location.href = '/error?code=403';
-      return;
-    }
-    setHistory(getAnnouncementHistory());
+    const syncNoticeFromLocation = () => {
+      setSelectedNoticeId(readNoticeId());
+    };
+
+    window.addEventListener('popstate', syncNoticeFromLocation);
+    return () => window.removeEventListener('popstate', syncNoticeFromLocation);
   }, []);
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setFeedback('');
+  useEffect(() => {
+    const loadNotices = async () => {
+      setLoading(true);
+      setError('');
 
-    const user = getUser();
-    if (!user || !canSendAnnouncement(user)) return;
+      try {
+        const response = await getNotices({ page: 0, size: 30 });
+        setNotices(response.content);
 
-    const trimTitle = title.trim();
-    const trimMessage = message.trim();
-    if (!trimTitle || !trimMessage) {
-      setFeedback('제목과 내용을 모두 입력해주세요.');
-      setFeedbackType('error');
+        setSelectedNoticeId((current) => {
+          if (current || response.content.length === 0) {
+            return current;
+          }
+
+          const firstNoticeId = response.content[0].noticeId;
+          updateNoticeQuery(firstNoticeId);
+          return firstNoticeId;
+        });
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '공지 목록을 불러오지 못했습니다.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadNotices();
+  }, []);
+
+  useEffect(() => {
+    if (!selectedNoticeId) {
+      setSelectedNotice(null);
       return;
     }
-    if (scheduleMode === 'later' && !scheduledAt) {
-      setFeedback('예약 발송 시간을 선택해주세요.');
-      setFeedbackType('error');
+
+    const loadNotice = async () => {
+      setDetailLoading(true);
+      setPublishError('');
+
+      try {
+        const response = await getNotice(selectedNoticeId);
+        setSelectedNotice(response);
+        updateNoticeQuery(selectedNoticeId);
+      } catch (caughtError) {
+        setPublishError(getErrorMessage(caughtError, '공지 상세를 불러오지 못했습니다.'));
+      } finally {
+        setDetailLoading(false);
+      }
+    };
+
+    void loadNotice();
+  }, [selectedNoticeId]);
+
+  async function refreshNotices(selectNoticeId?: number | null): Promise<void> {
+    const response = await getNotices({ page: 0, size: 30 });
+    setNotices(response.content);
+
+    if (selectNoticeId != null) {
+      setSelectedNoticeId(selectNoticeId);
       return;
     }
 
-    const count = sendAnnouncementWithOptions(
-      user.name,
-      user.email,
-      trimTitle,
-      trimMessage,
-      target,
-      annType,
-      scheduleMode === 'later' ? scheduledAt : undefined,
-    );
-
-    setTitle('');
-    setMessage('');
-    setScheduledAt('');
-    setScheduleMode('now');
-    setHistory(getAnnouncementHistory());
-
-    if (scheduleMode === 'later') {
-      setFeedback('예약 발송이 등록되었습니다.');
-    } else {
-      setFeedback(count > 0 ? `${count}명에게 발송되었습니다.` : '발송 대상이 없습니다.');
+    if (response.content.length > 0 && !selectedNoticeId) {
+      setSelectedNoticeId(response.content[0].noticeId);
     }
-    setFeedbackType('ok');
+  }
+
+  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!isAdmin) {
+      return;
+    }
+
+    setSubmitting(true);
+    setSubmitMessage('');
+    setPublishError('');
+
+    try {
+      const created = await createAdminNotice({
+        title: title.trim(),
+        content: content.trim(),
+        publishNow,
+      });
+
+      setTitle('');
+      setContent('');
+
+      if (created.publishedYn) {
+        setDraftNotice(null);
+        setSubmitMessage('공지가 즉시 발행되었습니다.');
+        await refreshNotices(created.noticeId);
+      } else {
+        setDraftNotice(created);
+        setSubmitMessage('공지 초안을 생성했습니다. 필요하면 바로 발행할 수 있습니다.');
+      }
+    } catch (caughtError) {
+      setSubmitMessage(getErrorMessage(caughtError, '공지 저장에 실패했습니다.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handlePublishDraft() {
+    if (!draftNotice) {
+      return;
+    }
+
+    setSubmitting(true);
+    setPublishError('');
+
+    try {
+      const published = await publishAdminNotice(draftNotice.noticeId);
+      setDraftNotice(null);
+      setSubmitMessage('초안 공지를 발행했습니다.');
+      await refreshNotices(published.noticeId);
+    } catch (caughtError) {
+      setPublishError(getErrorMessage(caughtError, '공지 발행에 실패했습니다.'));
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -114,157 +182,121 @@ export default function AnnouncementPage() {
 
       <main className="ann-content">
         <div className="ann-page-head">
-          <p className="ann-page-eyebrow">Admin · System Notice</p>
-          <h1 className="ann-page-title">공지 발송</h1>
-          <p className="ann-page-sub">발송 대상과 공지 유형을 선택하고 공지를 작성하세요.</p>
+          <p className="ann-page-eyebrow">Notice Board</p>
+          <h1 className="ann-page-title">공지사항</h1>
+          <p className="ann-page-sub">
+            공개 공지는 누구나 볼 수 있고, 관리자만 새 공지를 작성하고 발행할 수 있습니다.
+          </p>
         </div>
 
+        {error && <p className="ann-feedback ann-feedback--error">{error}</p>}
+
         <div className="ann-grid">
-          {/* ── 작성 폼 ── */}
-          <div className="ann-card">
-            <h2 className="ann-card-title">새 공지 작성</h2>
-
-            <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
-              <div className="ann-option-group">
-                <span className="ann-option-label">공지 유형</span>
-                <div className="ann-option-row">
-                  {TYPE_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`ann-option-btn type--${opt.value.toLowerCase()}${annType === opt.value ? ' selected' : ''}`}
-                      onClick={() => setAnnType(opt.value)}
-                    >
-                      <span>{opt.icon}</span>
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="ann-option-group">
-                <span className="ann-option-label">발송 대상</span>
-                <div className="ann-option-row">
-                  {TARGET_OPTIONS.map((opt) => (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      className={`ann-option-btn${target === opt.value ? ' selected' : ''}`}
-                      onClick={() => setTarget(opt.value)}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              <div className="ann-field">
-                <label htmlFor="ann-title">제목</label>
-                <input
-                  id="ann-title"
-                  className="ann-input"
-                  type="text"
-                  placeholder="공지 제목을 입력하세요"
-                  value={title}
-                  onChange={(e) => { setTitle(e.target.value); setFeedback(''); }}
-                  required
-                />
-              </div>
-
-              <div className="ann-field">
-                <label htmlFor="ann-message">내용</label>
-                <textarea
-                  id="ann-message"
-                  className="ann-textarea"
-                  placeholder="공지 내용을 입력하세요."
-                  rows={6}
-                  value={message}
-                  onChange={(e) => { setMessage(e.target.value); setFeedback(''); }}
-                  required
-                />
-              </div>
-
-              <div className="ann-option-group">
-                <span className="ann-option-label">발송 시간</span>
-                <div className="ann-schedule-row">
-                  <button
-                    type="button"
-                    className={`ann-radio-btn${scheduleMode === 'now' ? ' selected' : ''}`}
-                    onClick={() => setScheduleMode('now')}
-                  >
-                    즉시 발송
-                  </button>
-                  <button
-                    type="button"
-                    className={`ann-radio-btn${scheduleMode === 'later' ? ' selected' : ''}`}
-                    onClick={() => setScheduleMode('later')}
-                  >
-                    예약 발송
-                  </button>
-                </div>
-                {scheduleMode === 'later' && (
-                  <div className="ann-datetime-wrap">
-                    <input
-                      type="datetime-local"
-                      className="ann-datetime"
-                      value={scheduledAt}
-                      onChange={(e) => setScheduledAt(e.target.value)}
-                    />
-                  </div>
-                )}
-              </div>
-
-              <div className="ann-submit-row">
-                <button type="submit" className="ann-submit-btn">
-                  {scheduleMode === 'later' ? '예약 등록' : '발송하기'}
-                </button>
-                {feedback && (
-                  <p className={`ann-feedback${feedbackType === 'error' ? ' ann-feedback--error' : ''}`}>
-                    {feedback}
-                  </p>
-                )}
-              </div>
-            </form>
-          </div>
-
-          {/* ── 발송 내역 ── */}
-          <div className="ann-card">
-            <h2 className="ann-card-title">발송 내역</h2>
-            {history.length === 0 ? (
-              <p className="ann-empty">발송된 공지가 없습니다.</p>
+          <section className="ann-card">
+            <h2 className="ann-card-title">공지 목록</h2>
+            {loading ? (
+              <p className="ann-empty">목록을 불러오는 중입니다.</p>
+            ) : notices.length === 0 ? (
+              <p className="ann-empty">등록된 공지가 없습니다.</p>
             ) : (
               <ul className="ann-history-list">
-                {history.map((record) => (
-                  <li key={record.id} className="ann-history-item">
-                    <div className="ann-history-top">
-                      <span className={`ann-type-badge ann-type-badge--${record.announcementType.toLowerCase()}`}>
-                        {TYPE_LABEL[record.announcementType]}
-                      </span>
-                      <span className="ann-target-badge">
-                        {TARGET_LABEL[record.target]}
-                      </span>
-                      {record.scheduled && (
-                        <span className="ann-scheduled-badge">예약</span>
-                      )}
-                      <span className="ann-history-date">{formatDate(record.sentAt)}</span>
-                    </div>
-                    <div className="ann-history-title">{record.title}</div>
-                    <p className="ann-history-msg">{record.message}</p>
-                    <div className="ann-history-footer">
-                      <span>발송자: {record.senderName}</span>
-                      {!record.scheduled && (
-                        <span className="ann-recipient-count">{record.recipientCount}명 수신</span>
-                      )}
-                      {record.scheduled && record.scheduledAt && (
-                        <span>예약 시간: {formatDate(record.scheduledAt)}</span>
-                      )}
-                    </div>
+                {notices.map((notice) => (
+                  <li key={notice.noticeId} className="ann-history-item">
+                    <button
+                      type="button"
+                      className="ann-history-button"
+                      onClick={() => setSelectedNoticeId(notice.noticeId)}
+                    >
+                      <div className="ann-history-top">
+                        <span className="ann-type-badge ann-type-badge--general">공지</span>
+                        <span className="ann-history-date">{formatDateTime(notice.publishedAt)}</span>
+                      </div>
+                      <div className="ann-history-title">{notice.title}</div>
+                    </button>
                   </li>
                 ))}
               </ul>
             )}
-          </div>
+          </section>
+
+          <section className="ann-card">
+            <h2 className="ann-card-title">공지 상세</h2>
+            {detailLoading ? (
+              <p className="ann-empty">상세를 불러오는 중입니다.</p>
+            ) : selectedNotice ? (
+              <article className="ann-detail">
+                <div className="ann-history-top">
+                  <span className="ann-type-badge ann-type-badge--general">공지</span>
+                  <span className="ann-history-date">{formatDateTime(selectedNotice.publishedAt)}</span>
+                </div>
+                <h3 className="ann-detail-title">{selectedNotice.title}</h3>
+                <p className="ann-detail-body">{selectedNotice.content}</p>
+              </article>
+            ) : (
+              <p className="ann-empty">선택된 공지가 없습니다.</p>
+            )}
+            {publishError && <p className="ann-feedback ann-feedback--error">{publishError}</p>}
+          </section>
         </div>
+
+        {isAdmin && (
+          <section className="ann-card ann-admin-card">
+            <h2 className="ann-card-title">관리자 공지 작성</h2>
+            <form onSubmit={handleSubmit} className="ann-admin-form">
+              <div className="ann-field">
+                <label htmlFor="notice-title">제목</label>
+                <input
+                  id="notice-title"
+                  className="ann-input"
+                  type="text"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  placeholder="공지 제목을 입력하세요"
+                  required
+                />
+              </div>
+
+              <div className="ann-field">
+                <label htmlFor="notice-content">내용</label>
+                <textarea
+                  id="notice-content"
+                  className="ann-textarea"
+                  rows={6}
+                  value={content}
+                  onChange={(event) => setContent(event.target.value)}
+                  placeholder="공지 내용을 입력하세요"
+                  required
+                />
+              </div>
+
+              <label className="ann-checkbox">
+                <input
+                  type="checkbox"
+                  checked={publishNow}
+                  onChange={(event) => setPublishNow(event.target.checked)}
+                />
+                저장과 동시에 발행
+              </label>
+
+              <div className="ann-submit-row">
+                <button type="submit" className="ann-submit-btn" disabled={submitting}>
+                  {submitting ? '처리 중...' : publishNow ? '공지 발행' : '초안 저장'}
+                </button>
+                {submitMessage && <p className="ann-feedback">{submitMessage}</p>}
+              </div>
+            </form>
+
+            {draftNotice && !draftNotice.publishedYn && (
+              <div className="ann-draft-box">
+                <p className="ann-draft-title">미발행 초안 #{draftNotice.noticeId}</p>
+                <p className="ann-draft-meta">{draftNotice.title}</p>
+                <button type="button" className="ann-submit-btn" onClick={handlePublishDraft} disabled={submitting}>
+                  초안 발행
+                </button>
+              </div>
+            )}
+          </section>
+        )}
       </main>
     </div>
   );

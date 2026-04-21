@@ -1,30 +1,31 @@
-import type { ReviewRecord } from '../../store/appReviewStore';
+import type { ReviewSummaryResponse, ReviewTagCodeResponse } from '../../api/reviews';
+import { formatDateTime } from '../../lib/referenceData';
 
 interface Props {
-  reviews: ReviewRecord[];
-  isFreelancer: boolean;
+  reviews: ReviewSummaryResponse[];
   editingReviewId: number | null;
   editRating: number;
-  editTags: string[];
+  editTagCodes: string[];
   editContent: string;
-  reviewTags: string[];
+  reviewTags: ReviewTagCodeResponse[];
+  canEdit: boolean;
   setEditingReviewId: (id: number | null) => void;
-  setEditRating: (r: number) => void;
-  setEditContent: (c: string) => void;
-  handleEditTagToggle: (tag: string) => void;
-  handleReviewUpdate: (id: number) => void;
-  handleReviewDelete: (id: number) => void;
-  startEditReview: (review: ReviewRecord) => void;
+  setEditRating: (rating: number) => void;
+  setEditContent: (content: string) => void;
+  handleEditTagToggle: (tagCode: string) => void;
+  handleReviewUpdate: (reviewId: number) => void;
+  handleReviewDelete: (reviewId: number) => void;
+  startEditReview: (review: ReviewSummaryResponse) => void;
 }
 
 export default function ReviewsTab({
   reviews,
-  isFreelancer,
   editingReviewId,
   editRating,
-  editTags,
+  editTagCodes,
   editContent,
   reviewTags,
+  canEdit,
   setEditingReviewId,
   setEditRating,
   setEditContent,
@@ -40,18 +41,18 @@ export default function ReviewsTab({
       ) : (
         <ul className="review-list">
           {reviews.map((review) => (
-            <li key={review.id} className="review-item">
+            <li key={review.reviewId} className="review-item">
               <div className="review-header">
                 <div>
-                  <span className="review-service">{review.freelancerName}</span>
+                  <span className="review-service">{review.freelancerName || review.projectTitle}</span>
                   <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
                 </div>
-                <span className="review-date">{review.date}</span>
+                <span className="review-date">{formatDateTime(review.createdAt)}</span>
               </div>
               <div className="review-tag-row">
-                {review.tags.map((tag) => <span key={tag} className="skill-tag">{tag}</span>)}
+                {review.tagCodes.map((tagCode) => <span key={tagCode} className="skill-tag">{tagCode}</span>)}
               </div>
-              {!isFreelancer && editingReviewId === review.id ? (
+              {canEdit && editingReviewId === review.reviewId ? (
                 <div className="review-editor">
                   <div className="review-rating-row">
                     {[1, 2, 3, 4, 5].map((score) => (
@@ -68,38 +69,38 @@ export default function ReviewsTab({
                   <div className="type-selector">
                     {reviewTags.map((tag) => (
                       <button
-                        key={tag}
+                        key={tag.code}
                         type="button"
-                        className={`type-btn${editTags.includes(tag) ? ' selected' : ''}`}
-                        onClick={() => handleEditTagToggle(tag)}
+                        className={`type-btn${editTagCodes.includes(tag.code) ? ' selected' : ''}`}
+                        onClick={() => handleEditTagToggle(tag.code)}
                       >
-                        {tag}
+                        {tag.name}
                       </button>
                     ))}
                   </div>
                   <textarea
                     className="bio-textarea"
                     value={editContent}
-                    onChange={(e) => setEditContent(e.target.value)}
+                    onChange={(event) => setEditContent(event.target.value)}
                     rows={4}
                   />
                   <div className="bio-actions">
-                    <button className="btn-edit" onClick={() => handleReviewUpdate(review.id)}>저장</button>
+                    <button className="btn-edit" onClick={() => handleReviewUpdate(review.reviewId)}>저장</button>
                     <button className="btn-cancel" onClick={() => setEditingReviewId(null)}>취소</button>
                   </div>
                 </div>
               ) : (
-                <p className="review-content">{review.content}</p>
+                <p className="review-content">{review.blindedYn ? '블라인드 처리된 리뷰입니다.' : review.content}</p>
               )}
               <div className="review-actions-row">
-                {!isFreelancer && (
+                {canEdit && (
                   <>
                     <button className="btn-edit" onClick={() => startEditReview(review)}>수정</button>
-                    <button className="btn-cancel" onClick={() => handleReviewDelete(review.id)}>삭제</button>
+                    <button className="btn-cancel" onClick={() => handleReviewDelete(review.reviewId)}>삭제</button>
                   </>
                 )}
                 <span className="review-state-text">
-                  {review.blinded ? '블라인드됨' : review.reported ? '신고 접수됨' : '정상 노출'}
+                  {review.blindedYn ? '블라인드' : review.reported ? '신고 접수됨' : '정상 노출'}
                 </span>
               </div>
             </li>

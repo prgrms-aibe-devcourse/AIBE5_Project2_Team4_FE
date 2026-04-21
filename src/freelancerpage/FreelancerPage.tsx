@@ -1,20 +1,25 @@
-import { useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import './freelancer.css';
 import AppHeader from '../components/AppHeader';
-import { FREELANCERS } from '../store/appFreelancerStore';
-import { getFreelancerReviewSummary } from '../store/appReviewStore';
+import { getFreelancers, type PublicFreelancerSummaryResponse } from '../api/freelancers';
+import { getProjectTypeCodes, getRegionCodes } from '../api/codes';
+import { getErrorMessage } from '../lib/errors';
+import { labelOf } from '../lib/referenceData';
 
-const ALL_SKILLS = ['전체', '병원 동행', '외출 보조', '생활동행', '관공서 업무'];
+let rafPending = false;
 
-let _rafPending = false;
 function handleCardPointerMove(event: ReactPointerEvent<HTMLLIElement>) {
-  if (_rafPending) return;
-  _rafPending = true;
+  if (rafPending) {
+    return;
+  }
+
+  rafPending = true;
   const card = event.currentTarget;
   const clientX = event.clientX;
   const clientY = event.clientY;
+
   requestAnimationFrame(() => {
-    _rafPending = false;
+    rafPending = false;
     const rect = card.getBoundingClientRect();
     const pointerX = (clientX - rect.left) / rect.width;
     const pointerY = (clientY - rect.top) / rect.height;
@@ -38,19 +43,81 @@ function handleCardPointerLeave(event: ReactPointerEvent<HTMLLIElement>) {
 }
 
 export default function FreelancerPage() {
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [page, setPage] = useState(0);
+  const [totalPages, setTotalPages] = useState(0);
+  const [hasNext, setHasNext] = useState(false);
+  const [freelancers, setFreelancers] = useState<PublicFreelancerSummaryResponse[]>([]);
   const [search, setSearch] = useState('');
-  const [skillFilter, setSkillFilter] = useState('전체');
+  const [skillFilter, setSkillFilter] = useState('ALL');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [projectTypeOptions, setProjectTypeOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
+  const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
 
-  // FR-MATCH-01: 검색 + 스킬 필터 (verified만)
-  const filtered = FREELANCERS.filter(f => {
-    const skillMatch  = skillFilter === '전체' || f.skills.includes(skillFilter);
-    const searchMatch = !search.trim() ||
-      f.name.includes(search.trim()) ||
-      f.skills.some(s => s.includes(search.trim())) ||
-      f.availableRegions.some(r => r.includes(search.trim()));
-    return skillMatch && searchMatch;
-  });
+  useEffect(() => {
+    const loadCodes = async () => {
+      try {
+        const [projectTypes, regions] = await Promise.all([
+          getProjectTypeCodes(),
+          getRegionCodes(),
+        ]);
+
+        setProjectTypeOptions(projectTypes.map(({ code, name }) => ({ code, name })));
+        setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
+        setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '프리랜서 기준 코드를 불러오지 못했습니다.'));
+      }
+    };
+
+    void loadCodes();
+  }, []);
+
+  useEffect(() => {
+    const loadFreelancers = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const response = await getFreelancers({ page, size: 24 });
+        setFreelancers(response.content);
+        setTotalPages(response.totalPages);
+        setHasNext(response.hasNext);
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '프리랜서 목록을 불러오지 못했습니다.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void loadFreelancers();
+  }, [page]);
+
+  const filtered = useMemo(() => {
+    const keyword = search.trim().toLowerCase();
+
+    return freelancers.filter((freelancer) => {
+      const skillMatched = skillFilter === 'ALL' || freelancer.projectTypeCodes.includes(skillFilter);
+      if (!skillMatched) {
+        return false;
+      }
+
+      if (!keyword) {
+        return true;
+      }
+
+      const searchable = [
+        freelancer.name,
+        freelancer.intro ?? '',
+        ...freelancer.projectTypeCodes.map((code) => labelOf(projectTypeMap, code)),
+        ...freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)),
+      ].join(' ').toLowerCase();
+
+      return searchable.includes(keyword);
+    });
+  }, [freelancers, projectTypeMap, regionMap, search, skillFilter]);
 
   return (
     <div className="freelancer-page">
@@ -60,99 +127,115 @@ export default function FreelancerPage() {
         <div className="fl-page-header">
           <div>
             <h1 className="fl-page-title">메이트 목록</h1>
-            <p className="fl-page-subtitle">검증된 메이트를 찾아보세요.</p>
+            <p className="fl-page-subtitle">실제 등록된 프리랜서 프로필과 활동 지역을 확인하세요.</p>
           </div>
         </div>
 
-        {/* FR-MATCH-01: 검색 */}
         <div className="fl-search-bar">
           <input
             type="text"
             className="fl-search-input"
-            placeholder="이름, 서비스, 지역으로 검색..."
+            placeholder="이름, 소개, 활동 지역으로 검색"
             value={search}
-            onChange={e => setSearch(e.target.value)}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </div>
 
         <div className="fl-filter-bar">
           <div className="fl-skill-filters">
-            {ALL_SKILLS.map(s => (
+            <button
+              type="button"
+              className={`fl-filter-chip${skillFilter === 'ALL' ? ' active' : ''}`}
+              onClick={() => setSkillFilter('ALL')}
+            >
+              전체
+            </button>
+            {projectTypeOptions.map((option) => (
               <button
-                key={s}
-                className={`fl-filter-chip${skillFilter === s ? ' active' : ''}`}
-                onClick={() => setSkillFilter(s)}
+                key={option.code}
+                type="button"
+                className={`fl-filter-chip${skillFilter === option.code ? ' active' : ''}`}
+                onClick={() => setSkillFilter(option.code)}
               >
-                {s}
+                {option.name}
               </button>
             ))}
           </div>
+
           <div className="fl-view-toggle">
             <button
+              type="button"
               className={`fl-view-btn${viewMode === 'list' ? ' active' : ''}`}
               onClick={() => setViewMode('list')}
               title="리스트 보기"
             >
-              ☰
+              List
             </button>
             <button
+              type="button"
               className={`fl-view-btn${viewMode === 'grid' ? ' active' : ''}`}
               onClick={() => setViewMode('grid')}
-              title="타일 보기"
+              title="그리드 보기"
             >
-              ⊞
+              Grid
             </button>
           </div>
         </div>
 
-        {filtered.length === 0 ? (
-          <div className="fl-empty">검색 결과가 없습니다.</div>
+        {error && <p className="fl-empty">{error}</p>}
+
+        {loading ? (
+          <div className="fl-empty">프리랜서 목록을 불러오는 중입니다.</div>
+        ) : filtered.length === 0 ? (
+          <div className="fl-empty">조건에 맞는 프리랜서가 없습니다.</div>
         ) : (
           <ul className={viewMode === 'grid' ? 'fl-grid' : 'fl-list'}>
-            {filtered.map(f => (
+            {filtered.map((freelancer) => (
               <li
-                key={f.id}
+                key={freelancer.freelancerProfileId}
                 className={`fl-card${viewMode === 'grid' ? ' fl-card--grid' : ''}`}
-                onClick={() => window.location.href = `/freelancers/${f.id}`}
+                onClick={() => { window.location.href = `/freelancers/${freelancer.freelancerProfileId}`; }}
                 onPointerMove={handleCardPointerMove}
                 onPointerLeave={handleCardPointerLeave}
               >
                 <div className="fl-card-top">
-                  <div className="fl-avatar">
-                    {f.photo
-                      ? <img src={f.photo} alt={f.name} className="fl-avatar-img" loading="lazy" />
-                      : f.name[0]
-                    }
-                  </div>
+                  <div className="fl-avatar">{freelancer.name[0]}</div>
                   <div className="fl-card-info">
                     <div className="fl-name-row">
-                      <span className="fl-name">{f.name}</span>
-                      <span className="fl-verified-badge">✦ 인증됨</span>
+                      <span className="fl-name">{freelancer.name}</span>
+                      {freelancer.verifiedYn && <span className="fl-verified-badge">인증됨</span>}
                     </div>
                     <div className="fl-skills">
-                      {f.skills.map(s => <span key={s} className="fl-skill-tag">{s}</span>)}
+                      {freelancer.projectTypeCodes.map((code) => (
+                        <span key={code} className="fl-skill-tag">{labelOf(projectTypeMap, code)}</span>
+                      ))}
                     </div>
                   </div>
                   <div className="fl-rating">
                     <span className="fl-star">★</span>
-                    <span className="fl-rating-num">{
-                      (() => {
-                        const { averageRating, reviewCount } = getFreelancerReviewSummary(f.id);
-                        return (reviewCount === 0 ? f.rating : averageRating).toFixed(1);
-                      })()
-                    }</span>
+                    <span className="fl-rating-num">{(freelancer.averageRating ?? 0).toFixed(1)}</span>
                   </div>
                 </div>
-                <p className="fl-bio">{f.bio}</p>
+                <p className="fl-bio">{freelancer.intro || '등록된 소개가 없습니다.'}</p>
                 <div className="fl-stats">
-                  <span>📍 {f.availableRegions[0]}{f.availableRegions.length > 1 ? ` 외 ${f.availableRegions.length - 1}곳` : ''}</span>
-                  <span>프로젝트 {f.projectCount}건</span>
-                  <span>리뷰 {f.reviewCount}개</span>
+                  <span>지역 {freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)).join(', ') || '-'}</span>
+                  <span>활동 {freelancer.activityCount ?? 0}건</span>
+                  <span>{freelancer.caregiverYn ? '요양보호사 보유' : '일반 프로필'}</span>
                 </div>
               </li>
             ))}
           </ul>
         )}
+
+        <div className="fl-pagination">
+          <button type="button" className="fl-filter-chip" onClick={() => setPage((current) => Math.max(current - 1, 0))} disabled={page === 0}>
+            이전
+          </button>
+          <span className="fl-pagination-label">{page + 1} / {Math.max(totalPages, 1)}</span>
+          <button type="button" className="fl-filter-chip" onClick={() => setPage((current) => current + 1)} disabled={!hasNext}>
+            다음
+          </button>
+        </div>
       </main>
     </div>
   );
