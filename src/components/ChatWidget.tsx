@@ -45,7 +45,6 @@ export default function ChatWidget() {
   const refreshConvs = useCallback(() => {
     if (!user || user.role === 'ROLE_ADMIN') return;
     const convs = getConversationsFor(user.email, user.role);
-    // sort by latest message
     convs.sort((a, b) => {
       const aLast = getMessages(a.id).at(-1)?.sentAt ?? '';
       const bLast = getMessages(b.id).at(-1)?.sentAt ?? '';
@@ -59,6 +58,11 @@ export default function ChatWidget() {
     if (!activeConv) return;
     setMessages(getMessages(activeConv.id));
   }, [activeConv]);
+
+  const refreshConvsRef = useRef(refreshConvs);
+  const refreshMsgsRef = useRef(refreshMsgs);
+  useEffect(() => { refreshConvsRef.current = refreshConvs; }, [refreshConvs]);
+  useEffect(() => { refreshMsgsRef.current = refreshMsgs; }, [refreshMsgs]);
 
   useEffect(() => { refreshConvs(); }, [refreshConvs]);
   useEffect(() => { refreshMsgs(); }, [refreshMsgs]);
@@ -80,13 +84,13 @@ export default function ChatWidget() {
     if (isOpen && view === 'chat') inputRef.current?.focus();
   }, [isOpen, view, activeConv]);
 
-  // polling + chat event listener
+  // polling + chat event listener — deps [] so interval is never torn down/recreated
   useEffect(() => {
-    const tick = setInterval(() => { refreshConvs(); refreshMsgs(); }, 2000);
-    const handler = () => { refreshConvs(); refreshMsgs(); };
+    const tick = setInterval(() => { refreshConvsRef.current(); refreshMsgsRef.current(); }, 5000);
+    const handler = () => { refreshConvsRef.current(); refreshMsgsRef.current(); };
     window.addEventListener(CHAT_EVENT, handler);
     return () => { clearInterval(tick); window.removeEventListener(CHAT_EVENT, handler); };
-  }, [refreshConvs, refreshMsgs]);
+  }, []);
 
   // Open specific conversation from external trigger (e.g. FreelancerDetailPage)
   useEffect(() => {
@@ -123,7 +127,7 @@ export default function ChatWidget() {
   const partnerName = (conv: Conversation) =>
     user.role === 'ROLE_USER' ? conv.freelancerName : conv.userName;
 
-  const partnerLabel = (conv: Conversation) =>
+  const partnerLabel = (_conv: Conversation) =>
     user.role === 'ROLE_USER' ? '메이트' : '보호자';
 
   return (

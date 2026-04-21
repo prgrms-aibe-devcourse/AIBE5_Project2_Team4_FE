@@ -162,3 +162,9 @@ export function findAccount(email: string, password: string): DemoAccount | null
     a => a.email === email && a.password === password
   ) ?? null;
 }
+
+export function findAccountByEmail(email: string): DemoAccount | null {
+  return [...DEMO_ACCOUNTS, ...getRegisteredAccounts()].find(
+    a => a.email === email
+  ) ?? null;
+}

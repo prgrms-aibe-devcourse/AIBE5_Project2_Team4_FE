@@ -129,7 +129,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
           <li><a href="/#services" className={activePage === 'services' ? 'active' : ''}>SERVICES</a></li>
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
-          <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>HELPERS</a></li>
+          <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>MATES</a></li>
         </ul>
 
         {user ? (

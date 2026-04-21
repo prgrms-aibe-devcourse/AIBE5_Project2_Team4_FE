@@ -286,3 +286,122 @@ body {
   color: var(--text-secondary);
   font-family: monospace;
 }
+
+.login-pw-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.find-pw-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 0.82rem;
+  color: var(--green-accent);
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+}
+
+.find-pw-link:hover {
+  text-decoration: underline;
+}
+
+.find-pw-result {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem 0 1rem;
+  text-align: center;
+}
+
+.find-pw-success-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--green-accent) 18%, transparent);
+  border: 2px solid var(--green-accent);
+  color: var(--green-accent);
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.find-pw-fail-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: rgba(224, 112, 112, 0.12);
+  border: 2px solid #e07070;
+  color: #e07070;
+  font-size: 1.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.find-pw-result-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-light);
+  margin: 0;
+}
+
+.find-pw-result-email {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.find-pw-result-desc {
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.find-pw-password-box {
+  width: 100%;
+  background: var(--dark-bg);
+  border: 1px solid var(--green-accent);
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.find-pw-password-label {
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.find-pw-password-value {
+  font-size: 0.95rem;
+  font-family: monospace;
+  color: var(--green-accent);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+}
+
+.find-pw-back {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0.75rem 0 0;
+  font-size: 0.88rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-family: inherit;
+  text-align: center;
+  margin-top: 0.5rem;
+}
+
+.find-pw-back:hover {
+  color: var(--text-light);
+}

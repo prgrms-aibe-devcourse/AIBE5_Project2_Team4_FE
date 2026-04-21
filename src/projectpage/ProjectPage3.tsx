@@ -1,4 +1,4 @@
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import './project.css';
 import AppHeader from '../components/AppHeader';
 import { getUser, type User } from '../store/appAuth';
@@ -125,11 +125,12 @@ export default function ProjectPage3() {
       ? allProposals.filter((p) => p.freelancerEmail === user.email)
       : allProposals.filter((p) => p.userEmail === user.email);
     setProposals(visibleProposals);
-  }, [user, showCreateModal, showReviewModal, selectedProject]);
+  }, [user]);
 
-  const filteredProjects = statusFilter === 'ALL'
-    ? projects
-    : projects.filter((p) => p.status === statusFilter);
+  const filteredProjects = useMemo(
+    () => statusFilter === 'ALL' ? projects : projects.filter((p) => p.status === statusFilter),
+    [projects, statusFilter]
+  );
 
   function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

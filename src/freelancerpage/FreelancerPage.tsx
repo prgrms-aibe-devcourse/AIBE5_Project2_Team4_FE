@@ -6,19 +6,26 @@ import { getFreelancerReviewSummary } from '../store/appReviewStore';
 
 const ALL_SKILLS = ['전체', '병원 동행', '외출 보조', '생활동행', '관공서 업무'];
 
+let _rafPending = false;
 function handleCardPointerMove(event: ReactPointerEvent<HTMLLIElement>) {
+  if (_rafPending) return;
+  _rafPending = true;
   const card = event.currentTarget;
-  const rect = card.getBoundingClientRect();
-  const pointerX = (event.clientX - rect.left) / rect.width;
-  const pointerY = (event.clientY - rect.top) / rect.height;
-  const rotateY = (pointerX - 0.5) * 10;
-  const rotateX = (0.5 - pointerY) * 9;
-
-  card.style.setProperty('--card-rotate-x', `${rotateX.toFixed(2)}deg`);
-  card.style.setProperty('--card-rotate-y', `${rotateY.toFixed(2)}deg`);
-  card.style.setProperty('--card-pointer-x', `${(pointerX * 100).toFixed(2)}%`);
-  card.style.setProperty('--card-pointer-y', `${(pointerY * 100).toFixed(2)}%`);
-  card.style.setProperty('--card-glare-opacity', '1');
+  const clientX = event.clientX;
+  const clientY = event.clientY;
+  requestAnimationFrame(() => {
+    _rafPending = false;
+    const rect = card.getBoundingClientRect();
+    const pointerX = (clientX - rect.left) / rect.width;
+    const pointerY = (clientY - rect.top) / rect.height;
+    const rotateY = (pointerX - 0.5) * 10;
+    const rotateX = (0.5 - pointerY) * 9;
+    card.style.setProperty('--card-rotate-x', `${rotateX.toFixed(2)}deg`);
+    card.style.setProperty('--card-rotate-y', `${rotateY.toFixed(2)}deg`);
+    card.style.setProperty('--card-pointer-x', `${(pointerX * 100).toFixed(2)}%`);
+    card.style.setProperty('--card-pointer-y', `${(pointerY * 100).toFixed(2)}%`);
+    card.style.setProperty('--card-glare-opacity', '1');
+  });
 }
 
 function handleCardPointerLeave(event: ReactPointerEvent<HTMLLIElement>) {
@@ -113,7 +120,7 @@ export default function FreelancerPage() {
                 <div className="fl-card-top">
                   <div className="fl-avatar">
                     {f.photo
-                      ? <img src={f.photo} alt={f.name} className="fl-avatar-img" />
+                      ? <img src={f.photo} alt={f.name} className="fl-avatar-img" loading="lazy" />
                       : f.name[0]
                     }
                   </div>

@@ -175,7 +175,7 @@ export default function FreelancerDetailPage2() {
           <div className="fd-profile-right">
             <div className="fd-photo-frame">
               {freelancer.photo
-                ? <img src={freelancer.photo} alt={freelancer.name} className="fd-photo-img" />
+                ? <img src={freelancer.photo} alt={freelancer.name} className="fd-photo-img" loading="lazy" />
                 : <div className="fd-photo-avatar">{freelancer.name[0]}</div>
               }
             </div>
