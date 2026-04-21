@@ -39,7 +39,11 @@ export function login(email: string, password: string): Promise<User> {
 }
 
 export function loginWithKakaoAccessToken(accessToken: string): Promise<User> {
-  return kakaoLoginSession(accessToken);
+  return kakaoLoginSession({ accessToken });
+}
+
+export function loginWithKakaoAuthorizationCode(authorizationCode: string): Promise<User> {
+  return kakaoLoginSession({ authorizationCode });
 }
 
 export function signup(request: AuthSignupRequest): Promise<AuthSignupResponse> {

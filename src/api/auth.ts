@@ -36,7 +36,8 @@ export interface AuthLogoutResponse {
 }
 
 export interface KakaoLoginRequest {
-  accessToken: string;
+  accessToken?: string;
+  authorizationCode?: string;
 }
 
 export function login(request: { email: string; password: string }): Promise<AuthTokenResponse> {

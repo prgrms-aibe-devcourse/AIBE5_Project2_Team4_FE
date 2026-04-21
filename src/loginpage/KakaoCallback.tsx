@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import './login.css';
-import { exchangeKakaoAuthorizationCode, validateKakaoState } from '../auth/kakaoOAuth';
-import { loginWithKakaoAccessToken } from '../store/appAuth';
+import { validateKakaoState } from '../auth/kakaoOAuth';
+import { loginWithKakaoAuthorizationCode } from '../store/appAuth';
+
+const CALLBACK_TIMEOUT_MS = 15_000;
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
@@ -11,13 +13,28 @@ function getErrorMessage(error: unknown): string {
   return '카카오 로그인에 실패했습니다.';
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => {
+        reject(new Error('카카오 로그인 응답 시간이 초과되었습니다. 백엔드 서버와 카카오 키 설정을 확인해 주세요.'));
+      }, timeoutMs);
+    }),
+  ]);
+}
+
 export default function KakaoCallback() {
+  const startedRef = useRef(false);
   const [message, setMessage] = useState('카카오 로그인을 처리하고 있습니다.');
   const [error, setError] = useState('');
 
   useEffect(() => {
-    let cancelled = false;
+    if (startedRef.current) {
+      return;
+    }
 
+    startedRef.current = true;
     async function completeLogin() {
       const params = new URLSearchParams(window.location.search);
       const kakaoError = params.get('error');
@@ -31,24 +48,15 @@ export default function KakaoCallback() {
       }
 
       validateKakaoState(params.get('state'));
-      const kakaoAccessToken = await exchangeKakaoAuthorizationCode(code);
-      if (!cancelled) {
-        setMessage('서비스 로그인을 완료하고 있습니다.');
-      }
+      setMessage('서비스 로그인을 완료하고 있습니다.');
 
-      await loginWithKakaoAccessToken(kakaoAccessToken);
+      await withTimeout(loginWithKakaoAuthorizationCode(code), CALLBACK_TIMEOUT_MS);
       window.location.replace('/');
     }
 
     void completeLogin().catch((caughtError) => {
-      if (!cancelled) {
-        setError(getErrorMessage(caughtError));
-      }
+      setError(getErrorMessage(caughtError));
     });
-
-    return () => {
-      cancelled = true;
-    };
   }, []);
 
   return (

@@ -55,11 +55,9 @@ export default function Login() {
   function handleKakaoLogin() {
     setError('');
 
-    try {
-      startKakaoAuthorization();
-    } catch (caughtError) {
+    void startKakaoAuthorization().catch((caughtError) => {
       setError(getErrorMessage(caughtError));
-    }
+    });
   }
 
   const handleThemeToggle = () => {
