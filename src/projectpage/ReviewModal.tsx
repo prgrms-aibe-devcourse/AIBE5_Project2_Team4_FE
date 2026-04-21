@@ -1,27 +1,31 @@
 import type { FormEvent } from 'react';
-import type { Project } from '../store/appProjectStore';
-import type { ReviewRecord } from '../store/appReviewStore';
+import type { ReviewDetailResponse } from '../api/reviews';
 
 interface ReviewForm {
   rating: number;
-  tags: string[];
+  tagCodes: string[];
   content: string;
 }
 
+interface ReviewTagOption {
+  code: string;
+  name: string;
+}
+
 interface Props {
-  project: Project;
-  selectedReview: ReviewRecord | null;
+  projectTitle: string;
+  selectedReview: ReviewDetailResponse | null;
   reviewForm: ReviewForm;
-  reviewTags: string[];
+  reviewTags: ReviewTagOption[];
   onClose: () => void;
-  onSubmit: (e: FormEvent<HTMLFormElement>) => void;
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onRatingChange: (rating: number) => void;
-  onTagToggle: (tag: string) => void;
+  onTagToggle: (tagCode: string) => void;
   onContentChange: (content: string) => void;
 }
 
 export default function ReviewModal({
-  project,
+  projectTitle,
   selectedReview,
   reviewForm,
   reviewTags,
@@ -33,9 +37,9 @@ export default function ReviewModal({
 }: Props) {
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal review-modal" onClick={(e) => e.stopPropagation()}>
+      <div className="modal review-modal" onClick={(event) => event.stopPropagation()}>
         <button type="button" className="modal-close" onClick={onClose}>닫기</button>
-        <h2 className="modal-title">{project.title} 리뷰</h2>
+        <h2 className="modal-title">{projectTitle} 리뷰</h2>
 
         <form className="create-form" onSubmit={onSubmit}>
           <div className="form-group">
@@ -59,12 +63,12 @@ export default function ReviewModal({
             <div className="type-selector">
               {reviewTags.map((tag) => (
                 <button
-                  key={tag}
+                  key={tag.code}
                   type="button"
-                  className={`type-btn${reviewForm.tags.includes(tag) ? ' selected' : ''}`}
-                  onClick={() => onTagToggle(tag)}
+                  className={`type-btn${reviewForm.tagCodes.includes(tag.code) ? ' selected' : ''}`}
+                  onClick={() => onTagToggle(tag.code)}
                 >
-                  {tag}
+                  {tag.name}
                 </button>
               ))}
             </div>
@@ -73,16 +77,16 @@ export default function ReviewModal({
           <div className="form-group">
             <label>리뷰 내용</label>
             <textarea
-              placeholder="완료된 프로젝트 경험을 남겨주세요."
+              placeholder="완료된 프로젝트 경험을 남겨 주세요"
               value={reviewForm.content}
-              onChange={(e) => onContentChange(e.target.value)}
+              onChange={(event) => onContentChange(event.target.value)}
               rows={5}
               required
             />
           </div>
 
           {selectedReview && (
-            <p className="review-helper-text">이미 같은 프로젝트에 작성한 리뷰가 있어 수정 모드로 열렸습니다.</p>
+            <p className="review-helper-text">기존 리뷰를 수정하는 중입니다.</p>
           )}
 
           <button type="submit" className="btn-create form-submit">

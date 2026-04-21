@@ -1,124 +1,167 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import './freelancerDetail.css';
 import AppHeader from '../components/AppHeader';
-import { getFreelancerById } from '../store/appFreelancerStore';
-import { getKnownUsers, getUser } from '../store/appAuth';
+import { getUser } from '../store/appAuth';
 import { canReportReview } from '../store/accessControl';
-import { addProposal } from '../store/appProposalStore';
-import { getReviewsForFreelancer, reportReview } from '../store/appReviewStore';
-import { createNotification } from '../store/notificationStore';
-import { makeConvId, registerConversation, CHAT_OPEN_EVENT } from '../store/chatStore';
-import type { Conversation } from '../store/chatStore';
+import { getProjectTypeCodes, getAvailableTimeSlotCodes, getRegionCodes } from '../api/codes';
+import { getFreelancer, type PublicFreelancerDetailResponse } from '../api/freelancers';
+import { createProposal } from '../api/proposals';
+import { getMyProjects, type ProjectSummaryResponse } from '../api/projects';
+import { createReviewReport, type ReportReasonType } from '../api/reports';
+import { getFreelancerReviews, type ReviewSummaryResponse } from '../api/reviews';
+import { getErrorMessage } from '../lib/errors';
+import { formatDateTime, labelOf } from '../lib/referenceData';
 
-const MOCK_USER_PROJECTS = [
-  { id: 2, title: '주민센터 서류 발급', type: '관공서', date: '2025.04.22', time: '14:00', location: '서울 마포구 합정동', description: '주민등록등본 발급이 필요합니다.' },
-  { id: 6, title: '정형외과 진료 동행', type: '병원', date: '2025.04.25', time: '10:30', location: '서울 강남구 역삼동', description: '정형외과 진료 접수와 귀가를 도와주세요.' },
+const REPORT_REASON_OPTIONS: Array<{ code: ReportReasonType; label: string }> = [
+  { code: 'SPAM', label: '스팸' },
+  { code: 'ABUSE', label: '욕설 및 비방' },
+  { code: 'FALSE_INFO', label: '허위 정보' },
+  { code: 'ETC', label: '기타' },
 ];
 
-export default function FreelancerDetailPage2() {
+function getFreelancerProfileId(): number | null {
   const id = Number(window.location.pathname.split('/').pop());
-  const freelancer = getFreelancerById(id);
+  return Number.isFinite(id) ? id : null;
+}
+
+export default function FreelancerDetailPage2() {
+  const freelancerProfileId = getFreelancerProfileId();
   const user = getUser();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [freelancer, setFreelancer] = useState<PublicFreelancerDetailResponse | null>(null);
+  const [reviews, setReviews] = useState<ReviewSummaryResponse[]>([]);
+  const [availableProjects, setAvailableProjects] = useState<ProjectSummaryResponse[]>([]);
   const [proposing, setProposing] = useState(false);
+  const [proposalMessage, setProposalMessage] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [reportingReviewId, setReportingReviewId] = useState<number | null>(null);
-  const [reportReason, setReportReason] = useState('');
+  const [reportReasonType, setReportReasonType] = useState<ReportReasonType>('ETC');
+  const [reportReasonDetail, setReportReasonDetail] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
+  const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
+  const [timeSlotMap, setTimeSlotMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
-    if (!freelancer) {
+    if (!freelancerProfileId) {
       window.location.href = '/error?code=404';
+      return;
     }
-  }, [freelancer]);
 
-  const reviews = freelancer ? getReviewsForFreelancer(freelancer.id) : [];
+    const initialize = async () => {
+      setLoading(true);
+      setError('');
+
+      try {
+        const [projectTypes, regions, timeSlots, detail, reviewPage] = await Promise.all([
+          getProjectTypeCodes(),
+          getRegionCodes(),
+          getAvailableTimeSlotCodes(),
+          getFreelancer(freelancerProfileId),
+          getFreelancerReviews(freelancerProfileId, { page: 0, size: 50 }),
+        ]);
+
+        setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
+        setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
+        setTimeSlotMap(new Map(timeSlots.map((item) => [item.code, item.name])));
+        setFreelancer(detail);
+        setReviews(reviewPage.content);
+
+        if (user?.role === 'ROLE_USER') {
+          const projectPage = await getMyProjects({ status: 'REQUESTED', page: 0, size: 100 });
+          setAvailableProjects(projectPage.content);
+        }
+      } catch (caughtError) {
+        setError(getErrorMessage(caughtError, '프리랜서 상세 정보를 불러오지 못했습니다.'));
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    void initialize();
+  }, [freelancerProfileId, user?.role]);
+
+  const ratingAverage = useMemo(() => {
+    if (!reviews.length) {
+      return freelancer?.averageRating ?? 0;
+    }
+
+    return reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
+  }, [freelancer?.averageRating, reviews]);
+
+  async function handleSendProposal() {
+    if (!freelancer || !selectedProjectId) {
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      await createProposal(selectedProjectId, {
+        freelancerProfileId: freelancer.freelancerProfileId,
+        message: proposalMessage.trim() || undefined,
+      });
+      setSelectedProjectId(null);
+      setProposalMessage('');
+      setProposing(false);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '프로젝트 제안 전송에 실패했습니다.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  async function handleReviewReport() {
+    if (!reportingReviewId) {
+      return;
+    }
+
+    const targetReview = reviews.find((review) => review.reviewId === reportingReviewId);
+    if (!targetReview || !canReportReview(user, { reviewerUserId: targetReview.reviewerUserId })) {
+      window.location.href = '/error?code=403';
+      return;
+    }
+
+    setSubmitting(true);
+    setError('');
+
+    try {
+      await createReviewReport(reportingReviewId, {
+        reasonType: reportReasonType,
+        reasonDetail: reportReasonDetail.trim() || undefined,
+      });
+      setReportingReviewId(null);
+      setReportReasonDetail('');
+      setReportReasonType('ETC');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '리뷰 신고 접수에 실패했습니다.'));
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  if (!freelancerProfileId || loading) {
+    return (
+      <div className="fd-page">
+        <AppHeader activePage="freelancers" />
+        <main className="fd-content">
+          <p className="fd-empty">프리랜서 정보를 불러오는 중입니다.</p>
+        </main>
+      </div>
+    );
+  }
 
   if (!freelancer) {
-    return null;
-  }
-
-  const ratingAverage = reviews.length === 0
-    ? freelancer.rating
-    : reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length;
-
-  function handleSendProposal() {
-    if (!freelancer || !selectedProjectId || !user) {
-      return;
-    }
-
-    const project = MOCK_USER_PROJECTS.find((item) => item.id === selectedProjectId);
-    if (!project) {
-      return;
-    }
-
-    addProposal({
-      freelancerId: freelancer.id,
-      freelancerName: freelancer.name,
-      freelancerEmail: freelancer.accountEmail,
-      projectId: project.id,
-      projectTitle: project.title,
-      projectType: project.type,
-      date: project.date,
-      time: project.time,
-      location: project.location,
-      description: project.description,
-      userName: user.name,
-      userEmail: user.email,
-      status: 'PENDING',
-    });
-
-    if (freelancer.accountEmail) {
-      createNotification({
-        userEmail: freelancer.accountEmail,
-        type: 'PROPOSAL_RECEIVED',
-        title: '새 프로젝트 제안을 받았습니다',
-        message: `${user.name}님이 "${project.title}" 프로젝트를 제안했습니다.`,
-        link: '/mypage?tab=proposals',
-      });
-    }
-
-    setSelectedProjectId(null);
-    setProposing(false);
-  }
-
-  function handleStartChat() {
-    if (!user || !freelancer) return;
-    const conv: Conversation = {
-      id: makeConvId(user.email, freelancer.id),
-      userEmail: user.email,
-      userName: user.name,
-      freelancerId: freelancer.id,
-      freelancerName: freelancer.name,
-      freelancerEmail: freelancer.accountEmail ?? '',
-    };
-    registerConversation(conv);
-    window.dispatchEvent(new CustomEvent(CHAT_OPEN_EVENT, { detail: conv }));
-  }
-
-  function handleReviewReport() {
-    if (!reportingReviewId) return;
-    const targetReview = reviews.find((review) => review.id === reportingReviewId);
-    if (!targetReview || !canReportReview(user, targetReview)) {
-      location.assign('/error?code=403');
-      return;
-    }
-
-    const reason = reportReason.trim() || '부적절한 리뷰로 신고되었습니다.';
-    reportReview(reportingReviewId, reason);
-
-    // 관리자에게 알림 전송
-    const admins = getKnownUsers().filter(u => u.role === 'ROLE_ADMIN');
-    admins.forEach(admin => {
-      createNotification({
-        userEmail: admin.email,
-        type: 'PROJECT_STATUS',
-        title: '리뷰 신고가 접수되었습니다',
-        message: `"${targetReview.authorName}"님의 리뷰가 신고되었습니다. 사유: ${reason}`,
-        link: '/mypage?tab=reports',
-      });
-    });
-
-    setReportingReviewId(null);
-    setReportReason('');
+    return (
+      <div className="fd-page">
+        <AppHeader activePage="freelancers" />
+        <main className="fd-content">
+          <p className="fd-empty">{error || '프리랜서 정보를 찾을 수 없습니다.'}</p>
+        </main>
+      </div>
+    );
   }
 
   return (
@@ -126,20 +169,19 @@ export default function FreelancerDetailPage2() {
       <AppHeader activePage="freelancers" />
 
       <main className="fd-content">
-        <button className="fd-back" onClick={() => history.back()}>← 목록으로</button>
+        <button className="fd-back" onClick={() => history.back()}>목록으로</button>
+        {error && <p className="fd-empty">{error}</p>}
 
         <section className="fd-profile-section">
           <div className="fd-profile-left">
             <div className="fd-name-block">
               <h1 className="fd-name">{freelancer.name}</h1>
-              {freelancer.verified && (
-                <span className="fd-verified-badge">✦ 인증됨</span>
-              )}
+              {freelancer.verifiedYn && <span className="fd-verified-badge">인증됨</span>}
             </div>
 
             <div className="fd-tag-row">
-              {freelancer.skills.map((skill) => (
-                <span key={skill} className="fd-tag">{skill}</span>
+              {freelancer.projectTypeCodes.map((code) => (
+                <span key={code} className="fd-tag">{labelOf(projectTypeMap, code)}</span>
               ))}
             </div>
 
@@ -153,35 +195,29 @@ export default function FreelancerDetailPage2() {
               <span className="fd-review-count">리뷰 {reviews.length}개</span>
             </div>
 
-            <p className="fd-bio">{freelancer.bio}</p>
+            <p className="fd-bio">{freelancer.intro || '등록된 소개가 없습니다.'}</p>
 
             <ul className="fd-meta-list">
-              <li><span className="fd-meta-icon">⏰</span>{freelancer.availableHours}</li>
-              <li><span className="fd-meta-icon">📍</span>{freelancer.availableRegions.join(' · ')}</li>
-              <li><span className="fd-meta-icon">📋</span>완료 프로젝트 {freelancer.projectCount}건</li>
-              {freelancer.portfolio && (
-                <li><span className="fd-meta-icon">📁</span><span className="fd-portfolio-link">{freelancer.portfolio}</span></li>
-              )}
+              <li><span className="fd-meta-icon">🕒</span>{freelancer.availableTimeSlotCodes.map((code) => labelOf(timeSlotMap, code)).join(', ') || '-'}</li>
+              <li><span className="fd-meta-icon">📍</span>{freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)).join(', ') || '-'}</li>
+              <li><span className="fd-meta-icon">📌</span>활동 {freelancer.activityCount ?? 0}건</li>
+              <li><span className="fd-meta-icon">🩺</span>{freelancer.caregiverYn ? '요양보호사 자격 보유' : '일반 활동자'}</li>
             </ul>
 
             {user?.role === 'ROLE_USER' && (
               <div className="fd-action-row">
                 <button className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
-                <button className="fd-chat-btn" onClick={handleStartChat}>채팅하기</button>
               </div>
             )}
           </div>
 
           <div className="fd-profile-right">
             <div className="fd-photo-frame">
-              {freelancer.photo
-                ? <img src={freelancer.photo} alt={freelancer.name} className="fd-photo-img" loading="lazy" />
-                : <div className="fd-photo-avatar">{freelancer.name[0]}</div>
-              }
+              <div className="fd-photo-avatar">{freelancer.name[0]}</div>
             </div>
             <div className="fd-photo-stat">
-              <span className="fd-photo-stat-num">{freelancer.projectCount}</span>
-              <span className="fd-photo-stat-label">완료</span>
+              <span className="fd-photo-stat-num">{freelancer.activityCount ?? 0}</span>
+              <span className="fd-photo-stat-label">활동 수</span>
             </div>
           </div>
         </section>
@@ -189,39 +225,25 @@ export default function FreelancerDetailPage2() {
         <section className="fd-section">
           <h2 className="fd-section-title">제공 서비스</h2>
           <div className="fd-services-grid">
-            {freelancer.skills.map((skill) => {
-              const SKILL_ICON: Record<string, string> = {
-                '병원 동행': '🏥',
-                '외출 보조': '🚶',
-                '생활 지원': '🏠',
-                '생활동행': '🏠',
-                '관공서 업무': '🏛️',
-                '행정 업무': '📋',
-                '일상 대화': '💬',
-                '식사 보조': '🍱',
-                '약 복용 관리': '💊',
-                '운동 보조': '🏃',
-              };
-              return (
-                <div key={skill} className="fd-service-card">
-                  <div className="fd-service-icon">{SKILL_ICON[skill] ?? '✦'}</div>
-                  <span className="fd-service-label">{skill}</span>
-                </div>
-              );
-            })}
+            {freelancer.projectTypeCodes.map((code) => (
+              <div key={code} className="fd-service-card">
+                <div className="fd-service-icon">✓</div>
+                <span className="fd-service-label">{labelOf(projectTypeMap, code)}</span>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="fd-section">
           <h2 className="fd-section-title">리뷰</h2>
           {reviews.length === 0 ? (
-            <p className="fd-empty">아직 리뷰가 없습니다.</p>
+            <p className="fd-empty">등록된 리뷰가 없습니다.</p>
           ) : (
             <ul className="fd-review-grid">
               {reviews.map((review) => (
-                <li key={review.id} className="fd-review-card">
+                <li key={review.reviewId} className="fd-review-card">
                   <div className="fd-review-top">
-                    <span className="fd-review-author">{review.authorName}</span>
+                    <span className="fd-review-author">{review.reviewerName || `사용자 #${review.reviewerUserId}`}</span>
                     <span className="fd-review-stars">
                       {Array.from({ length: 5 }, (_, index) => (
                         <span key={index} className={index < review.rating ? 'star-filled' : 'star-empty'}>★</span>
@@ -229,14 +251,24 @@ export default function FreelancerDetailPage2() {
                     </span>
                   </div>
                   <div className="review-tag-row">
-                    {review.tags.map((tag) => <span key={tag} className="skill-tag">{tag}</span>)}
+                    {review.tagCodes.map((tagCode) => <span key={tagCode} className="skill-tag">{tagCode}</span>)}
                   </div>
-                  <p className="fd-review-content">{review.content}</p>
-                  <span className="fd-review-date">{review.date}</span>
-                  {canReportReview(user, review) && (
+                  <p className="fd-review-content">
+                    {review.blindedYn ? '블라인드 처리된 리뷰입니다.' : review.content}
+                  </p>
+                  <span className="fd-review-date">{formatDateTime(review.createdAt)}</span>
+                  <div className="fd-review-status-row">
+                    {review.reported && <span className="skill-tag">신고 접수됨</span>}
+                    {review.blindedYn && <span className="skill-tag">블라인드</span>}
+                  </div>
+                  {canReportReview(user, { reviewerUserId: review.reviewerUserId }) && (
                     <button
                       className="fd-report-btn"
-                      onClick={() => { setReportingReviewId(review.id); setReportReason(''); }}
+                      onClick={() => {
+                        setReportingReviewId(review.reviewId);
+                        setReportReasonDetail('');
+                        setReportReasonType('ETC');
+                      }}
                     >
                       신고
                     </button>
@@ -248,78 +280,81 @@ export default function FreelancerDetailPage2() {
         </section>
       </main>
 
-      {reportingReviewId !== null && (() => {
-        const targetReview = reviews.find(r => r.id === reportingReviewId);
-        return (
-          <div className="fd-modal-overlay" onClick={() => setReportingReviewId(null)}>
-            <div className="fd-modal" onClick={e => e.stopPropagation()}>
-              <button className="fd-modal-close" onClick={() => setReportingReviewId(null)}>닫기</button>
-              <h3 className="fd-modal-title">리뷰 신고</h3>
-              <div className="fd-report-info">
-                <p className="fd-report-author">{targetReview?.authorName}님의 리뷰</p>
-                <p className="fd-report-preview">"{targetReview?.content}"</p>
+      {reportingReviewId !== null && (
+        <div className="fd-modal-overlay" onClick={() => setReportingReviewId(null)}>
+          <div className="fd-modal" onClick={(event) => event.stopPropagation()}>
+            <button className="fd-modal-close" onClick={() => setReportingReviewId(null)}>닫기</button>
+            <h3 className="fd-modal-title">리뷰 신고</h3>
+            <div className="fd-report-form">
+              <label className="fd-report-label">신고 유형</label>
+              <div className="fd-report-tag-row">
+                {REPORT_REASON_OPTIONS.map((option) => (
+                  <button
+                    key={option.code}
+                    type="button"
+                    className={`fd-report-tag${reportReasonType === option.code ? ' selected' : ''}`}
+                    onClick={() => setReportReasonType(option.code)}
+                  >
+                    {option.label}
+                  </button>
+                ))}
               </div>
-              <div className="fd-report-form">
-                <label className="fd-report-label">신고 사유</label>
-                <div className="fd-report-tag-row">
-                  {['부적절한 내용', '허위 정보', '광고/스팸', '욕설/비하', '기타'].map(tag => (
-                    <button
-                      key={tag}
-                      type="button"
-                      className={`fd-report-tag${reportReason === tag ? ' selected' : ''}`}
-                      onClick={() => setReportReason(tag)}
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-                <input
-                  type="text"
-                  className="fd-report-input"
-                  placeholder="직접 입력 (선택사항)"
-                  value={reportReason}
-                  onChange={e => setReportReason(e.target.value)}
-                />
-              </div>
-              <button
-                className="fd-report-submit"
-                onClick={handleReviewReport}
-              >
-                신고 접수
-              </button>
+              <input
+                type="text"
+                className="fd-report-input"
+                placeholder="상세 사유를 입력하세요"
+                value={reportReasonDetail}
+                onChange={(event) => setReportReasonDetail(event.target.value)}
+              />
             </div>
+            <button className="fd-report-submit" onClick={() => void handleReviewReport()} disabled={submitting}>
+              신고 접수
+            </button>
           </div>
-        );
-      })()}
+        </div>
+      )}
 
       {proposing && (
         <div className="fd-modal-overlay" onClick={() => setProposing(false)}>
           <div className="fd-modal" onClick={(event) => event.stopPropagation()}>
             <button className="fd-modal-close" onClick={() => setProposing(false)}>닫기</button>
             <h3 className="fd-modal-title">{freelancer.name}님에게 제안할 프로젝트</h3>
-            <ul className="fd-project-list">
-              {MOCK_USER_PROJECTS.map((project) => (
-                <li
-                  key={project.id}
-                  className={`fd-project-item${selectedProjectId === project.id ? ' selected' : ''}`}
-                  onClick={() => setSelectedProjectId(project.id)}
+            {availableProjects.length === 0 ? (
+              <p className="fd-empty">제안 가능한 요청 상태 프로젝트가 없습니다.</p>
+            ) : (
+              <>
+                <ul className="fd-project-list">
+                  {availableProjects.map((project) => (
+                    <li
+                      key={project.projectId}
+                      className={`fd-project-item${selectedProjectId === project.projectId ? ' selected' : ''}`}
+                      onClick={() => setSelectedProjectId(project.projectId)}
+                    >
+                      <div className="fd-project-top">
+                        <span className="fd-project-type">{labelOf(projectTypeMap, project.projectTypeCode)}</span>
+                        <span className="fd-project-date">{formatDateTime(project.requestedStartAt)}</span>
+                      </div>
+                      <p className="fd-project-title">{project.title}</p>
+                      <p className="fd-project-loc">지역 {labelOf(regionMap, project.serviceRegionCode)}</p>
+                    </li>
+                  ))}
+                </ul>
+                <textarea
+                  className="fd-report-input"
+                  rows={4}
+                  placeholder="제안 메시지를 입력하세요"
+                  value={proposalMessage}
+                  onChange={(event) => setProposalMessage(event.target.value)}
+                />
+                <button
+                  className="fd-propose-btn"
+                  disabled={!selectedProjectId || submitting}
+                  onClick={() => void handleSendProposal()}
                 >
-                  <div className="fd-project-top">
-                    <span className="fd-project-type">{project.type}</span>
-                    <span className="fd-project-date">{project.date} {project.time}</span>
-                  </div>
-                  <p className="fd-project-title">{project.title}</p>
-                  <p className="fd-project-loc">📍 {project.location}</p>
-                </li>
-              ))}
-            </ul>
-            <button
-              className="fd-propose-btn"
-              disabled={!selectedProjectId}
-              onClick={handleSendProposal}
-            >
-              제안 보내기
-            </button>
+                  제안 보내기
+                </button>
+              </>
+            )}
           </div>
         </div>
       )}
