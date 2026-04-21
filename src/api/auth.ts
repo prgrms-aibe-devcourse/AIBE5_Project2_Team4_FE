@@ -20,7 +20,7 @@ export interface AuthSignupRequest {
   email: string;
   password: string;
   name: string;
-  phone?: string;
+  phone: string;
   intro?: string;
 }
 
@@ -35,8 +35,21 @@ export interface AuthLogoutResponse {
   revokedRefreshTokenCount: number;
 }
 
+export interface KakaoLoginRequest {
+  accessToken: string;
+}
+
 export function login(request: { email: string; password: string }): Promise<AuthTokenResponse> {
   return requestJson<AuthTokenResponse>('/api/v1/auth/login', {
+    method: 'POST',
+    body: request,
+    auth: false,
+    retryOnAuthFailure: false,
+  });
+}
+
+export function kakaoLogin(request: KakaoLoginRequest): Promise<AuthTokenResponse> {
+  return requestJson<AuthTokenResponse>('/api/v1/auth/oauth/kakao', {
     method: 'POST',
     body: request,
     auth: false,

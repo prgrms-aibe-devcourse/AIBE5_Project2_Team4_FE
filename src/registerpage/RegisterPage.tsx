@@ -11,10 +11,37 @@ function getErrorMessage(error: unknown): string {
   return '회원가입에 실패했습니다.';
 }
 
+function formatPhone(value: string): string {
+  const digits = value.replace(/\D/g, '').slice(0, 11);
+
+  if (digits.startsWith('02')) {
+    if (digits.length <= 2) {
+      return digits;
+    }
+
+    if (digits.length <= 6) {
+      return `${digits.slice(0, 2)}-${digits.slice(2)}`;
+    }
+
+    return `${digits.slice(0, 2)}-${digits.slice(2, -4)}-${digits.slice(-4)}`;
+  }
+
+  if (digits.length <= 3) {
+    return digits;
+  }
+
+  if (digits.length <= 7) {
+    return `${digits.slice(0, 3)}-${digits.slice(3)}`;
+  }
+
+  return `${digits.slice(0, 3)}-${digits.slice(3, 7)}-${digits.slice(7)}`;
+}
+
 export default function RegisterPage() {
   const [theme, setThemeState] = useState<AppTheme>('dark');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [error, setError] = useState('');
@@ -47,6 +74,19 @@ export default function RegisterPage() {
       return;
     }
 
+    const trimmedPhone = phone.trim();
+    const phoneDigits = trimmedPhone.replace(/\D/g, '');
+
+    if (!trimmedPhone) {
+      setError('전화번호를 입력해 주세요.');
+      return;
+    }
+
+    if (!/^0\d{8,10}$/.test(phoneDigits)) {
+      setError('전화번호 형식을 확인해 주세요.');
+      return;
+    }
+
     if (password.length < 6) {
       setError('비밀번호는 6자 이상이어야 합니다.');
       return;
@@ -63,6 +103,7 @@ export default function RegisterPage() {
       await signup({
         name: name.trim(),
         email: email.trim(),
+        phone: trimmedPhone,
         password,
       });
       setSuccess(true);
@@ -118,6 +159,23 @@ export default function RegisterPage() {
               value={email}
               onChange={(event) => {
                 setEmail(event.target.value);
+                setError('');
+              }}
+              required
+            />
+          </div>
+
+          <div className="input-group">
+            <label htmlFor="reg-phone">전화번호</label>
+            <input
+              id="reg-phone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              placeholder="010-1234-5678"
+              value={phone}
+              onChange={(event) => {
+                setPhone(formatPhone(event.target.value));
                 setError('');
               }}
               required

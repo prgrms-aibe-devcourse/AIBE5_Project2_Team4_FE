@@ -9,6 +9,7 @@ initTheme();
 const path = window.location.pathname;
 const publicRoute = path === '/' ||
   path === '/login' ||
+  path === '/login/kakao/callback' ||
   path === '/register' ||
   path === '/announcement' ||
   path === '/freelancers' ||
@@ -27,6 +28,7 @@ const routeAccess = canAccessRoute(path, user);
 
 const reactPages: Record<string, () => Promise<{ default: React.ComponentType }>> = {
   '/login': () => import('./loginpage/Login'),
+  '/login/kakao/callback': () => import('./loginpage/KakaoCallback'),
   '/register': () => import('./registerpage/RegisterPage'),
   '/announcement': () => import('./announcementpage/AnnouncementPage'),
   '/mypage': () => import('./mypage/MyPage2'),

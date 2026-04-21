@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import './login.css';
+import { startKakaoAuthorization } from '../auth/kakaoOAuth';
 import { login } from '../store/appAuth';
 import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 
@@ -48,6 +49,16 @@ export default function Login() {
       setError(getErrorMessage(caughtError));
     } finally {
       setSubmitting(false);
+    }
+  }
+
+  function handleKakaoLogin() {
+    setError('');
+
+    try {
+      startKakaoAuthorization();
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError));
     }
   }
 
@@ -143,7 +154,7 @@ export default function Login() {
             <button
               type="button"
               className="kakao-login-btn"
-              onClick={() => alert('카카오 로그인은 준비 중입니다.')}
+              onClick={handleKakaoLogin}
             >
               <svg className="kakao-icon" viewBox="0 0 24 24" aria-hidden="true">
                 <path

@@ -2,6 +2,7 @@ import {
   bootstrapAuthSession,
   clearSession,
   getCurrentUser,
+  kakaoLoginSession,
   loginSession,
   logoutSession,
   signupSession,
@@ -35,6 +36,10 @@ export function bootstrapSession(): Promise<User | null> {
 
 export function login(email: string, password: string): Promise<User> {
   return loginSession(email, password);
+}
+
+export function loginWithKakaoAccessToken(accessToken: string): Promise<User> {
+  return kakaoLoginSession(accessToken);
 }
 
 export function signup(request: AuthSignupRequest): Promise<AuthSignupResponse> {
