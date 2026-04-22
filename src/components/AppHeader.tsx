@@ -46,7 +46,10 @@ function getNotificationLink(notification: NotificationSummaryResponse): string 
     case 'VERIFICATION_REJECTED':
       return '/mypage?tab=certify';
     case 'PROPOSAL_RECEIVED':
+      // 프리랜서가 받은 제안 목록으로 이동
+      return '/project';
     case 'PROPOSAL_ACCEPTED':
+      // 프로젝트 오너에게 특정 프로젝트로 이동
       return notification.relatedProjectId ? `/project?projectId=${notification.relatedProjectId}` : '/project';
     case 'PROJECT_STATUS_CHANGED':
     case 'REVIEW_REQUEST':
@@ -123,8 +126,8 @@ export default function AppHeader({ activePage }: HeaderProps) {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  function handleLogout() {
-    logout();
+  async function handleLogout() {
+    await logout();
     window.location.href = '/';
   }
 
@@ -185,6 +188,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
           <li><a href="/#about" className={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
           <li><a href="/#contact" className={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
           <li><a href="/freelancers" className={activePage === 'freelancers' ? 'active' : ''}>MATES</a></li>
+          <li><a href="/announcement" className={activePage === 'announcement' ? 'active' : ''}>ANNOUNCEMENT</a></li>
         </ul>
 
         {user ? (

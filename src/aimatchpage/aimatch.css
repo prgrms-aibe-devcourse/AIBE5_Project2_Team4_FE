@@ -272,13 +272,13 @@
   transition: stroke-dashoffset 0.8s cubic-bezier(0.4, 0, 0.2, 1);
 }
 .am-score-text {
-  font-size: 15px;
+  font-size: 18px;
   font-weight: 800;
   fill: var(--text-light);
   font-family: inherit;
 }
 .am-score-pct {
-  font-size: 10px;
+  font-size: 12px;
   font-weight: 600;
   fill: var(--text-secondary);
   font-family: inherit;
@@ -380,6 +380,7 @@
 .am-card-actions {
   display: flex;
   gap: 0.6rem;
+  flex-wrap: wrap;
 }
 .am-btn-chat {
   flex: 1;
@@ -399,8 +400,10 @@
   color: var(--dark-bg);
 }
 .am-btn-profile {
-  flex: 1;
-  padding: 0.6rem 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.6rem 1.5rem;
   border: none;
   background: var(--green-accent);
   color: var(--dark-bg);
@@ -409,6 +412,7 @@
   font-weight: 600;
   font-family: inherit;
   cursor: pointer;
+  text-decoration: none;
   transition: background 0.15s;
 }
 .am-btn-profile:hover {

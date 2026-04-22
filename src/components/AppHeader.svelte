@@ -101,7 +101,7 @@
   });
 
   async function handleLogout() {
-    logout();
+    await logout();
     window.location.href = '/';
   }
 
@@ -181,6 +181,7 @@
       <li><a href="/#about" class={activePage === 'about' ? 'active' : ''}>ABOUT</a></li>
       <li><a href="/#contact" class={activePage === 'contact' ? 'active' : ''}>CONTACT</a></li>
       <li><a href="/freelancers" class={activePage === 'freelancers' ? 'active' : ''}>MATES</a></li>
+      <li><a href="/announcement" class={activePage === 'announcement' ? 'active' : ''}>ANNOUNCEMENT</a></li>
     </ul>
 
     {#if user}
@@ -256,7 +257,9 @@
           {#if dropdownOpen}
             <div class="header-dropdown">
               <a href="/mypage" class="header-dropdown-item">마이페이지</a>
-              <a href="/project" class="header-dropdown-item">프로젝트</a>
+              {#if user.role !== 'ROLE_ADMIN'}
+                <a href="/project" class="header-dropdown-item">프로젝트</a>
+              {/if}
               {#if canSendAnnouncement(user)}
                 <a href="/announcement" class="header-dropdown-item">공지 관리</a>
               {/if}
