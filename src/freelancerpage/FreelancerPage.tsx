@@ -168,16 +168,30 @@ export default function FreelancerPage() {
               className={`fl-view-btn${viewMode === 'list' ? ' active' : ''}`}
               onClick={() => setViewMode('list')}
               title="리스트 보기"
+              aria-label="리스트 보기"
             >
-              List
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <line x1="8" y1="6" x2="21" y2="6"/>
+                <line x1="8" y1="12" x2="21" y2="12"/>
+                <line x1="8" y1="18" x2="21" y2="18"/>
+                <circle cx="3" cy="6" r="1" fill="currentColor" stroke="none"/>
+                <circle cx="3" cy="12" r="1" fill="currentColor" stroke="none"/>
+                <circle cx="3" cy="18" r="1" fill="currentColor" stroke="none"/>
+              </svg>
             </button>
             <button
               type="button"
               className={`fl-view-btn${viewMode === 'grid' ? ' active' : ''}`}
               onClick={() => setViewMode('grid')}
               title="그리드 보기"
+              aria-label="그리드 보기"
             >
-              Grid
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+              </svg>
             </button>
           </div>
         </div>
@@ -228,12 +242,34 @@ export default function FreelancerPage() {
         )}
 
         <div className="fl-pagination">
-          <button type="button" className="fl-filter-chip" onClick={() => setPage((current) => Math.max(current - 1, 0))} disabled={page === 0}>
-            이전
+          <button type="button" className="fl-page-btn fl-page-btn--arrow" onClick={() => setPage((p) => p - 1)} disabled={page === 0}>
+            ←
           </button>
-          <span className="fl-pagination-label">{page + 1} / {Math.max(totalPages, 1)}</span>
-          <button type="button" className="fl-filter-chip" onClick={() => setPage((current) => current + 1)} disabled={!hasNext}>
-            다음
+          {(() => {
+            const total = Math.max(totalPages, 1);
+            const pages: (number | '...')[] = [];
+            if (total <= 7) {
+              for (let i = 0; i < total; i++) pages.push(i);
+            } else {
+              pages.push(0);
+              if (page > 2) pages.push('...');
+              for (let i = Math.max(1, page - 1); i <= Math.min(total - 2, page + 1); i++) pages.push(i);
+              if (page < total - 3) pages.push('...');
+              pages.push(total - 1);
+            }
+            return pages.map((p, idx) =>
+              p === '...'
+                ? <span key={`ellipsis-${idx}`} className="fl-page-ellipsis">…</span>
+                : <button
+                    key={p}
+                    type="button"
+                    className={`fl-page-btn${page === p ? ' active' : ''}`}
+                    onClick={() => setPage(p)}
+                  >{p + 1}</button>
+            );
+          })()}
+          <button type="button" className="fl-page-btn fl-page-btn--arrow" onClick={() => setPage((p) => p + 1)} disabled={!hasNext}>
+            →
           </button>
         </div>
       </main>

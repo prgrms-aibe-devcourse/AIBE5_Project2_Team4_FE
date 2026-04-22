@@ -22,6 +22,7 @@ import {
   getProjectProposals,
   rejectProposal,
   type ProjectProposalSummaryResponse,
+  type ProposalDetailResponse,
   type ProposalSummaryResponse,
 } from '../api/proposals';
 import {
@@ -105,6 +106,23 @@ function toProjectRequest(form: ProjectFormValues): ProjectCreateRequest {
   };
 }
 
+function mergeProposalDetail(
+  proposal: ProposalSummaryResponse,
+  detail: ProposalDetailResponse,
+): ProposalSummaryResponse {
+  if (proposal.proposalId !== detail.proposalId) {
+    return proposal;
+  }
+
+  return {
+    ...proposal,
+    proposalStatus: detail.proposalStatus,
+    projectStatus: detail.projectStatus,
+    respondedAt: detail.respondedAt,
+    updatedAt: detail.updatedAt,
+  };
+}
+
 export default function ProjectPage3() {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
@@ -123,7 +141,7 @@ export default function ProjectPage3() {
   const [editForm, setEditForm] = useState<ProjectFormValues>(EMPTY_FORM);
   const [reviewForm, setReviewForm] = useState(EMPTY_REVIEW_FORM);
   const [projectTypeOptions, setProjectTypeOptions] = useState<Array<{ code: string; name: string }>>([]);
-  const [regionOptions, setRegionOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [regionOptions, setRegionOptions] = useState<Array<{ code: string; name: string; parentRegionCode?: string | null; regionLevel?: number | null }>>([]);
   const [reviewTagOptions, setReviewTagOptions] = useState<Array<{ code: string; name: string }>>([]);
   const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
@@ -166,7 +184,7 @@ export default function ProjectPage3() {
         ]);
 
         setProjectTypeOptions(projectTypes.map(({ code, name }) => ({ code, name })));
-        setRegionOptions(regions.map(({ code, name }) => ({ code, name })));
+        setRegionOptions(regions.map(({ code, name, parentRegionCode, regionLevel }) => ({ code, name, parentRegionCode, regionLevel })));
         setReviewTagOptions(reviewTags.map(({ code, name }) => ({ code, name })));
         setProjectTypeMap(toOptionMap(projectTypes));
         setRegionMap(toOptionMap(regions));
@@ -371,7 +389,10 @@ export default function ProjectPage3() {
     setError('');
 
     try {
-      await acceptProposal(proposalId);
+      const acceptedProposal = await acceptProposal(proposalId);
+      setFreelancerProposals((currentProposals) => (
+        currentProposals.map((proposal) => mergeProposalDetail(proposal, acceptedProposal))
+      ));
       await refreshFreelancerProposals();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '제안 수락에 실패했습니다.'));
@@ -385,7 +406,10 @@ export default function ProjectPage3() {
     setError('');
 
     try {
-      await rejectProposal(proposalId);
+      const rejectedProposal = await rejectProposal(proposalId);
+      setFreelancerProposals((currentProposals) => (
+        currentProposals.map((proposal) => mergeProposalDetail(proposal, rejectedProposal))
+      ));
       await refreshFreelancerProposals();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '제안 거절에 실패했습니다.'));
@@ -494,6 +518,7 @@ export default function ProjectPage3() {
         ) : isFreelancer ? (
           <ProposalTab
             proposals={freelancerProposals}
+            loading={mutationLoading}
             onAccept={(proposalId) => void handleProposalAccept(proposalId)}
             onReject={(proposalId) => void handleProposalReject(proposalId)}
             onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import './freelancerDetail.css';
 import AppHeader from '../components/AppHeader';
-import { getUser } from '../store/appAuth';
+import { AUTH_USER_EVENT, bootstrapSession, getUser, type User } from '../store/appAuth';
 import { canReportReview } from '../store/accessControl';
 import { getProjectTypeCodes, getAvailableTimeSlotCodes, getRegionCodes } from '../api/codes';
 import { getFreelancer, type PublicFreelancerDetailResponse } from '../api/freelancers';
@@ -26,13 +26,14 @@ function getFreelancerProfileId(): number | null {
 
 export default function FreelancerDetailPage2() {
   const freelancerProfileId = getFreelancerProfileId();
-  const user = getUser();
+  const [user, setUser] = useState<User | null>(() => getUser());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [freelancer, setFreelancer] = useState<PublicFreelancerDetailResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewSummaryResponse[]>([]);
   const [availableProjects, setAvailableProjects] = useState<ProjectSummaryResponse[]>([]);
   const [proposing, setProposing] = useState(false);
+  const [projectsLoading, setProjectsLoading] = useState(false);
   const [proposalMessage, setProposalMessage] = useState('');
   const [selectedProjectId, setSelectedProjectId] = useState<number | null>(null);
   const [reportingReviewId, setReportingReviewId] = useState<number | null>(null);
@@ -42,6 +43,30 @@ export default function FreelancerDetailPage2() {
   const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
   const [timeSlotMap, setTimeSlotMap] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    let mounted = true;
+    const syncUser = () => {
+      if (mounted) {
+        setUser(getUser());
+      }
+    };
+
+    syncUser();
+    void bootstrapSession().then((nextUser) => {
+      if (mounted) {
+        setUser(nextUser);
+      }
+    });
+
+    window.addEventListener(AUTH_USER_EVENT, syncUser);
+    window.addEventListener('focus', syncUser);
+    return () => {
+      mounted = false;
+      window.removeEventListener(AUTH_USER_EVENT, syncUser);
+      window.removeEventListener('focus', syncUser);
+    };
+  }, []);
 
   useEffect(() => {
     if (!freelancerProfileId) {
@@ -68,10 +93,6 @@ export default function FreelancerDetailPage2() {
         setFreelancer(detail);
         setReviews(reviewPage.content);
 
-        if (user?.role === 'ROLE_USER') {
-          const projectPage = await getMyProjects({ status: 'REQUESTED', page: 0, size: 100 });
-          setAvailableProjects(projectPage.content);
-        }
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프리랜서 상세 정보를 불러오지 못했습니다.'));
       } finally {
@@ -80,7 +101,35 @@ export default function FreelancerDetailPage2() {
     };
 
     void initialize();
-  }, [freelancerProfileId, user?.role]);
+  }, [freelancerProfileId]);
+
+  useEffect(() => {
+    if (!proposing || user?.role !== 'ROLE_USER') {
+      return;
+    }
+
+    const loadAvailableProjects = async () => {
+      setProjectsLoading(true);
+      setError('');
+
+      try {
+        const projectPage = await getMyProjects({ status: 'REQUESTED', page: 0, size: 100 });
+        setAvailableProjects(projectPage.content);
+        setSelectedProjectId((currentProjectId) => (
+          currentProjectId && projectPage.content.some((project) => project.projectId === currentProjectId)
+            ? currentProjectId
+            : null
+        ));
+      } catch (caughtError) {
+        setAvailableProjects([]);
+        setError(getErrorMessage(caughtError, '제안 가능한 프로젝트 목록을 불러오지 못했습니다.'));
+      } finally {
+        setProjectsLoading(false);
+      }
+    };
+
+    void loadAvailableProjects();
+  }, [proposing, user?.role]);
 
   const ratingAverage = useMemo(() => {
     if (!reviews.length) {
@@ -103,6 +152,7 @@ export default function FreelancerDetailPage2() {
         freelancerProfileId: freelancer.freelancerProfileId,
         message: proposalMessage.trim() || undefined,
       });
+      setAvailableProjects((currentProjects) => currentProjects.filter((project) => project.projectId !== selectedProjectId));
       setSelectedProjectId(null);
       setProposalMessage('');
       setProposing(false);
@@ -319,7 +369,9 @@ export default function FreelancerDetailPage2() {
           <div className="fd-modal" onClick={(event) => event.stopPropagation()}>
             <button className="fd-modal-close" onClick={() => setProposing(false)}>닫기</button>
             <h3 className="fd-modal-title">{freelancer.name}님에게 제안할 프로젝트</h3>
-            {availableProjects.length === 0 ? (
+            {projectsLoading ? (
+              <p className="fd-empty">제안 가능한 프로젝트를 불러오는 중입니다.</p>
+            ) : availableProjects.length === 0 ? (
               <p className="fd-empty">제안 가능한 요청 상태 프로젝트가 없습니다.</p>
             ) : (
               <>

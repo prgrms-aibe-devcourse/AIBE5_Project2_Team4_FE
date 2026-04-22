@@ -64,15 +64,7 @@ export default function AnnouncementPage() {
         const response = await getNotices({ page: 0, size: 30 });
         setNotices(response.content);
 
-        setSelectedNoticeId((current) => {
-          if (current || response.content.length === 0) {
-            return current;
-          }
-
-          const firstNoticeId = response.content[0].noticeId;
-          updateNoticeQuery(firstNoticeId);
-          return firstNoticeId;
-        });
+        setSelectedNoticeId((current) => current);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '공지 목록을 불러오지 못했습니다.'));
       } finally {
@@ -191,53 +183,64 @@ export default function AnnouncementPage() {
 
         {error && <p className="ann-feedback ann-feedback--error">{error}</p>}
 
-        <div className="ann-grid">
-          <section className="ann-card">
-            <h2 className="ann-card-title">공지 목록</h2>
-            {loading ? (
-              <p className="ann-empty">목록을 불러오는 중입니다.</p>
-            ) : notices.length === 0 ? (
-              <p className="ann-empty">등록된 공지가 없습니다.</p>
-            ) : (
-              <ul className="ann-history-list">
-                {notices.map((notice) => (
-                  <li key={notice.noticeId} className="ann-history-item">
-                    <button
-                      type="button"
-                      className="ann-history-button"
-                      onClick={() => setSelectedNoticeId(notice.noticeId)}
-                    >
-                      <div className="ann-history-top">
-                        <span className="ann-type-badge ann-type-badge--general">공지</span>
-                        <span className="ann-history-date">{formatDateTime(notice.publishedAt)}</span>
-                      </div>
-                      <div className="ann-history-title">{notice.title}</div>
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
+        <section className="ann-card">
+          <h2 className="ann-card-title">공지 목록</h2>
+          {loading ? (
+            <p className="ann-empty">목록을 불러오는 중입니다.</p>
+          ) : notices.length === 0 ? (
+            <p className="ann-empty">등록된 공지가 없습니다.</p>
+          ) : (
+            <ul className="ann-history-list">
+              {notices.map((notice) => (
+                <li key={notice.noticeId} className="ann-history-item">
+                  <button
+                    type="button"
+                    className="ann-history-button"
+                    onClick={() => setSelectedNoticeId(notice.noticeId)}
+                  >
+                    <div className="ann-history-top">
+                      <span className="ann-type-badge ann-type-badge--general">공지</span>
+                      <span className="ann-history-date">{formatDateTime(notice.publishedAt)}</span>
+                    </div>
+                    <div className="ann-history-title">{notice.title}</div>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
 
-          <section className="ann-card">
-            <h2 className="ann-card-title">공지 상세</h2>
-            {detailLoading ? (
-              <p className="ann-empty">상세를 불러오는 중입니다.</p>
-            ) : selectedNotice ? (
-              <article className="ann-detail">
-                <div className="ann-history-top">
-                  <span className="ann-type-badge ann-type-badge--general">공지</span>
-                  <span className="ann-history-date">{formatDateTime(selectedNotice.publishedAt)}</span>
-                </div>
-                <h3 className="ann-detail-title">{selectedNotice.title}</h3>
-                <p className="ann-detail-body">{selectedNotice.content}</p>
-              </article>
-            ) : (
-              <p className="ann-empty">선택된 공지가 없습니다.</p>
-            )}
-            {publishError && <p className="ann-feedback ann-feedback--error">{publishError}</p>}
-          </section>
-        </div>
+        {selectedNoticeId && (
+          <div className="ann-modal-backdrop" onClick={() => setSelectedNoticeId(null)}>
+            <div className="ann-modal" onClick={(e) => e.stopPropagation()}>
+              <button
+                type="button"
+                className="ann-modal-close"
+                onClick={() => setSelectedNoticeId(null)}
+                aria-label="닫기"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                  <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+              </button>
+              {detailLoading ? (
+                <p className="ann-empty">불러오는 중입니다...</p>
+              ) : selectedNotice ? (
+                <article className="ann-detail">
+                  <div className="ann-history-top">
+                    <span className="ann-type-badge ann-type-badge--general">공지</span>
+                    <span className="ann-history-date">{formatDateTime(selectedNotice.publishedAt)}</span>
+                  </div>
+                  <h3 className="ann-detail-title">{selectedNotice.title}</h3>
+                  <p className="ann-detail-body">{selectedNotice.content}</p>
+                </article>
+              ) : (
+                <p className="ann-empty">공지를 불러오지 못했습니다.</p>
+              )}
+              {publishError && <p className="ann-feedback ann-feedback--error">{publishError}</p>}
+            </div>
+          </div>
+        )}
 
         {isAdmin && (
           <section className="ann-card ann-admin-card">

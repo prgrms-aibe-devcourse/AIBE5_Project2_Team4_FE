@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type { FormEvent } from 'react';
 
 export interface ProjectFormValues {
@@ -14,6 +15,8 @@ export interface ProjectFormValues {
 interface Option {
   code: string;
   name: string;
+  parentRegionCode?: string | null;
+  regionLevel?: number | null;
 }
 
 interface Props {
@@ -37,6 +40,37 @@ export default function ProjectFormModal({
 }: Props) {
   const isEdit = mode === 'edit';
 
+  const topRegions = regionOptions.filter((r) => !r.parentRegionCode);
+  const allSubRegions = regionOptions.filter((r) => !!r.parentRegionCode);
+
+  const selectedTopCode = (() => {
+    if (!form.serviceRegionCode) return '';
+    const selected = regionOptions.find((r) => r.code === form.serviceRegionCode);
+    if (!selected) return '';
+    return selected.parentRegionCode ?? selected.code;
+  })();
+
+  const [openParent, setOpenParent] = useState<string>(selectedTopCode);
+
+  const subRegions = allSubRegions.filter((r) => r.parentRegionCode === openParent);
+
+  function handleTopRegionClick(code: string) {
+    const children = allSubRegions.filter((r) => r.parentRegionCode === code);
+    if (openParent === code) {
+      setOpenParent('');
+      if (form.serviceRegionCode !== code) {
+        onFieldChange('serviceRegionCode', '');
+      }
+    } else {
+      setOpenParent(code);
+      if (children.length === 0) {
+        onFieldChange('serviceRegionCode', code);
+      } else {
+        onFieldChange('serviceRegionCode', '');
+      }
+    }
+  }
+
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal" onClick={(event) => event.stopPropagation()}>
@@ -57,34 +91,49 @@ export default function ProjectFormModal({
 
           <div className="form-group">
             <label>서비스 유형</label>
-            <div className="role-select-wrapper">
-              <select
-                value={form.projectTypeCode}
-                onChange={(event) => onFieldChange('projectTypeCode', event.target.value)}
-                required
-              >
-                <option value="">선택해 주세요</option>
-                {projectTypeOptions.map((option) => (
-                  <option key={option.code} value={option.code}>{option.name}</option>
-                ))}
-              </select>
+            <div className="type-selector">
+              {projectTypeOptions.map((option) => (
+                <button
+                  key={option.code}
+                  type="button"
+                  className={`type-btn${form.projectTypeCode === option.code ? ' selected' : ''}`}
+                  onClick={() => onFieldChange('projectTypeCode', option.code)}
+                >
+                  {option.name}
+                </button>
+              ))}
             </div>
           </div>
 
           <div className="form-group">
             <label>활동 지역</label>
-            <div className="role-select-wrapper">
-              <select
-                value={form.serviceRegionCode}
-                onChange={(event) => onFieldChange('serviceRegionCode', event.target.value)}
-                required
-              >
-                <option value="">선택해 주세요</option>
-                {regionOptions.map((option) => (
-                  <option key={option.code} value={option.code}>{option.name}</option>
-                ))}
-              </select>
+            <div className="type-selector">
+              {topRegions.map((region) => (
+                <button
+                  key={region.code}
+                  type="button"
+                  className={`type-btn${openParent === region.code ? ' selected' : ''}`}
+                  onClick={() => handleTopRegionClick(region.code)}
+                >
+                  {region.name}
+                </button>
+              ))}
             </div>
+
+            {openParent && subRegions.length > 0 && (
+              <div className="type-selector region-sub-selector">
+                {subRegions.map((sub) => (
+                  <button
+                    key={sub.code}
+                    type="button"
+                    className={`type-btn type-btn--sub${form.serviceRegionCode === sub.code ? ' selected' : ''}`}
+                    onClick={() => onFieldChange('serviceRegionCode', sub.code)}
+                  >
+                    {sub.name}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-row">

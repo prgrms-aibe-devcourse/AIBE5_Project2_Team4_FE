@@ -20,6 +20,7 @@ const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
 
 interface Props {
   proposals: ProposalSummaryResponse[];
+  loading?: boolean;
   onAccept: (proposalId: number) => void;
   onReject: (proposalId: number) => void;
   onStartProject: (proposalId: number) => void;
@@ -28,6 +29,7 @@ interface Props {
 
 export default function ProposalTab({
   proposals,
+  loading = false,
   onAccept,
   onReject,
   onStartProject,
@@ -68,13 +70,15 @@ export default function ProposalTab({
                     <button
                       type="button"
                       className="proposal-btn proposal-btn--accept"
+                      disabled={loading}
                       onClick={() => onAccept(proposal.proposalId)}
                     >
-                      수락
+                      {loading ? '처리 중...' : '수락'}
                     </button>
                     <button
                       type="button"
                       className="proposal-btn proposal-btn--reject"
+                      disabled={loading}
                       onClick={() => onReject(proposal.proposalId)}
                     >
                       거절
@@ -85,18 +89,20 @@ export default function ProposalTab({
                   <button
                     type="button"
                     className="proposal-btn proposal-btn--accept"
+                    disabled={loading}
                     onClick={() => onStartProject(proposal.proposalId)}
                   >
-                    진행 시작
+                    {loading ? '처리 중...' : '진행 시작'}
                   </button>
                 )}
                 {proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'IN_PROGRESS' && (
                   <button
                     type="button"
                     className="proposal-btn proposal-btn--accept"
+                    disabled={loading}
                     onClick={() => onCompleteProject(proposal.proposalId)}
                   >
-                    완료 처리
+                    {loading ? '처리 중...' : '완료 처리'}
                   </button>
                 )}
                 {(proposal.proposalStatus !== 'PENDING'

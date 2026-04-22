@@ -22,16 +22,16 @@ export function setUser(user: User): void {
   updateCurrentUser(normalizeUser(user));
 }
 
-export function logout(): void {
-  void logoutSession();
+export function logout(): Promise<void> {
+  return logoutSession();
 }
 
 export function clearUserSession(): void {
   clearSession();
 }
 
-export function bootstrapSession(): Promise<User | null> {
-  return bootstrapAuthSession();
+export function bootstrapSession(force = false): Promise<User | null> {
+  return bootstrapAuthSession(force);
 }
 
 export function login(email: string, password: string): Promise<User> {
