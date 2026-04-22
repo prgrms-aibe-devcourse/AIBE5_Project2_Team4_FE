@@ -5,6 +5,7 @@
 
   let video: HTMLVideoElement;
   let rafId: number;
+  let contactSubmitted = false;
 
   function handleMouseMove(e: MouseEvent) {
     if (!video?.duration) return;
@@ -12,6 +13,17 @@
     rafId = requestAnimationFrame(() => {
       video.currentTime = (e.clientX / window.innerWidth) * video.duration;
     });
+  }
+
+  function handleContactSubmit(e: SubmitEvent) {
+    e.preventDefault();
+    const form = e.currentTarget as HTMLFormElement;
+    const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
+    const email = (form.elements.namedItem('email') as HTMLInputElement).value.trim();
+    const message = (form.elements.namedItem('message') as HTMLTextAreaElement).value.trim();
+    if (!name || !email || !message) return;
+    contactSubmitted = true;
+    form.reset();
   }
 
   onMount(() => {
@@ -31,14 +43,15 @@
   <section class="hero-section" id="home">
     <div class="hero-content">
       <div class="text-container">
-        <h1 class="greeting">안심하고 함께해요 !</h1>
+        <h1 class="greeting">믿을 수 있는 연결, 이음</h1>
         <p class="description">
           이음은 생활 지원이 필요한 분과 믿을 수 있는 메이트를 연결하는 매칭 플랫폼입니다.
           프로젝트를 등록하고, 검증된 메이트를 직접 탐색해 제안해보세요.
         </p>
         <div class="button-group">
-          <button class="btn-primary" onclick={() => window.location.href = '/freelancers'}>메이트 목록 보기</button>
+          <button class="btn-primary" onclick={() => window.location.href = '/ai-match'}>AI 추천</button>
           <button class="btn-secondary" onclick={() => window.location.href = '/project'}>프로젝트 등록하기</button>
+          <button class="btn-secondary" onclick={() => window.location.href = '/freelancers'}>메이트 둘러보기</button>
         </div>
       </div>
     </div>
@@ -135,11 +148,14 @@
             <span class="contact-value">영업일 기준 24시간 내</span>
           </div>
         </div>
-        <form class="contact-form">
-          <input type="text" placeholder="이름" class="form-input" />
-          <input type="email" placeholder="이메일" class="form-input" />
-          <textarea placeholder="문의 내용을 입력해주세요" class="form-textarea" rows="4"></textarea>
-          <button type="submit" class="btn-primary">보내기</button>
+        <form class="contact-form" onsubmit={handleContactSubmit}>
+          <input type="text" name="name" placeholder="이름" class="form-input" />
+          <input type="email" name="email" placeholder="이메일" class="form-input" />
+          <textarea name="message" placeholder="문의 내용을 입력해주세요" class="form-textarea" rows="4"></textarea>
+          {#if contactSubmitted}
+            <p class="contact-success">문의가 접수되었습니다. 영업일 기준 24시간 내 답변드리겠습니다.</p>
+          {/if}
+          <button type="submit" class="btn-primary" disabled={contactSubmitted}>보내기</button>
         </form>
       </div>
     </div>

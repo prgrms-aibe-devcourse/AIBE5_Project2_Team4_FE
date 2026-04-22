@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import './mypage.css';
 import AppHeader from '../components/AppHeader';
-import { getUser, setUser, type User } from '../store/appAuth';
+import { bootstrapSession, getUser, setUser, type User } from '../store/appAuth';
 import { canManageVerification, canModerateReviews, canModifyOwnReview } from '../store/accessControl';
 import { resolveApiAssetUrl } from '../api/client';
 import {
@@ -190,6 +190,8 @@ export default function MyPage2() {
   const [notice, setNotice] = useState('');
   const [profileForm, setProfileForm] = useState<ProfileFormState>(EMPTY_PROFILE_FORM);
   const [freelancerForm, setFreelancerForm] = useState<FreelancerFormState>(EMPTY_FREELANCER_FORM);
+  const [applyForm, setApplyForm] = useState<FreelancerFormState>(EMPTY_FREELANCER_FORM);
+  const [showMateApplyForm, setShowMateApplyForm] = useState(false);
   const [summary, setSummary] = useState<UserMyPageResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewSummaryResponse[]>([]);
   const [reports, setReports] = useState<ReportSummaryResponse[]>([]);
@@ -277,9 +279,10 @@ export default function MyPage2() {
         setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
         setTimeSlotMap(new Map(timeSlots.map((item) => [item.code, item.name])));
 
+        const isUser = user.role === 'ROLE_USER';
         const [myPageResponse, reviewPage, reportPage] = await Promise.all([
           getMyPage(),
-          getMyReviews({ page: 0, size: 100 }),
+          isUser ? getMyReviews({ page: 0, size: 100 }) : Promise.resolve({ content: [] as typeof reviews }),
           getMyReports({ page: 0, size: 100 }),
         ]);
 
@@ -352,9 +355,10 @@ export default function MyPage2() {
   }, [user]);
 
   async function refreshProfileSummary() {
+    const isUser = user?.role === 'ROLE_USER';
     const [myPageResponse, reviewPage, reportPage] = await Promise.all([
       getMyPage(),
-      getMyReviews({ page: 0, size: 100 }),
+      isUser ? getMyReviews({ page: 0, size: 100 }) : Promise.resolve({ content: [] as typeof reviews }),
       getMyReports({ page: 0, size: 100 }),
     ]);
 
@@ -457,6 +461,44 @@ export default function MyPage2() {
       setNotice('계정 정보를 저장했습니다.');
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '계정 정보 저장에 실패했습니다.'));
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleApplyAsFreelancer() {
+    if (!showMateApplyForm) {
+      setShowMateApplyForm(true);
+      return;
+    }
+
+    setSaving(true);
+    setError('');
+    setNotice('');
+
+    try {
+      const createdProfile = await createMyFreelancerProfile(toFreelancerRequest(applyForm));
+      setNotice('프리랜서 프로필 정보를 동기화하는 중입니다.');
+      const nextUser = await bootstrapSession(true);
+      const syncedUser = nextUser ?? {
+        ...user!,
+        role: 'ROLE_FREELANCER' as const,
+        roleCode: 'ROLE_FREELANCER' as const,
+      };
+
+      setUser(syncedUser);
+      setCurrentUser(syncedUser);
+      setFreelancerProfile(createdProfile);
+      setFreelancerForm(toFreelancerForm(createdProfile));
+      setApplyForm(EMPTY_FREELANCER_FORM);
+      setShowMateApplyForm(false);
+      setPortfolioFiles([]);
+      setVerifications(await getMyVerifications());
+      await refreshProfileSummary();
+      handleTabChange('certify');
+      setNotice('프리랜서 프로필 신청이 완료되었습니다. 인증 요청을 등록해 주세요.');
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '메이트 신청에 실패했습니다.'));
     } finally {
       setSaving(false);
     }
@@ -1010,6 +1052,116 @@ export default function MyPage2() {
               </div>
             )}
 
+            {!isFreelancer && (
+              <div className="account-card" style={{ marginTop: '1.5rem' }}>
+                <div className="account-card-head">
+                  <h2>메이트 신청</h2>
+                  <button className="btn-edit" onClick={() => setShowMateApplyForm((current) => !current)} disabled={saving}>
+                    {showMateApplyForm ? '접기' : '신청하기'}
+                  </button>
+                </div>
+                <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginBottom: '1rem' }}>
+                  메이트로 등록하면 돌봄 서비스를 제공하고 의뢰를 받을 수 있습니다. 아래 정보를 입력하고 신청하세요.
+                </p>
+
+                {showMateApplyForm && (
+                <div className="account-edit-form">
+                  <div className="account-field">
+                    <label>경력 소개</label>
+                    <textarea
+                      className="account-textarea"
+                      rows={4}
+                      placeholder="본인의 경력이나 돌봄 경험을 간략히 소개해 주세요"
+                      value={applyForm.careerDescription}
+                      onChange={(event) => setApplyForm((current) => ({ ...current, careerDescription: event.target.value }))}
+                    />
+                  </div>
+                  <div className="account-field">
+                    <label>프로필 공개 설정</label>
+                    <div className="type-selector">
+                      <button
+                        type="button"
+                        className={`type-btn${applyForm.publicYn ? ' selected' : ''}`}
+                        onClick={() => setApplyForm((current) => ({ ...current, publicYn: !current.publicYn }))}
+                      >
+                        {applyForm.publicYn ? '공개' : '비공개'}
+                      </button>
+                      <button
+                        type="button"
+                        className={`type-btn${applyForm.caregiverYn ? ' selected' : ''}`}
+                        onClick={() => setApplyForm((current) => ({ ...current, caregiverYn: !current.caregiverYn }))}
+                      >
+                        {applyForm.caregiverYn ? '요양보호사' : '일반 활동자'}
+                      </button>
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>활동 지역 (복수 선택)</label>
+                    <div className="type-selector">
+                      {regionOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${applyForm.activityRegionCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setApplyForm((current) => ({
+                            ...current,
+                            activityRegionCodes: toggleSelection(current.activityRegionCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>가능 시간대 (복수 선택)</label>
+                    <div className="type-selector">
+                      {timeSlotOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${applyForm.availableTimeSlotCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setApplyForm((current) => ({
+                            ...current,
+                            availableTimeSlotCodes: toggleSelection(current.availableTimeSlotCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="account-field">
+                    <label>제공 서비스 유형 (복수 선택)</label>
+                    <div className="type-selector">
+                      {projectTypeOptions.map((option) => (
+                        <button
+                          key={option.code}
+                          type="button"
+                          className={`type-btn${applyForm.projectTypeCodes.includes(option.code) ? ' selected' : ''}`}
+                          onClick={() => setApplyForm((current) => ({
+                            ...current,
+                            projectTypeCodes: toggleSelection(current.projectTypeCodes, option.code),
+                          }))}
+                        >
+                          {option.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn-edit"
+                    onClick={() => void handleApplyAsFreelancer()}
+                    disabled={saving}
+                  >
+                    제출하기
+                  </button>
+                </div>
+                )}
+              </div>
+            )}
+
             {isFreelancer && (
               <div className="account-card" style={{ marginTop: '1.5rem' }}>
                 <div className="account-card-head">
@@ -1379,3 +1531,4 @@ export default function MyPage2() {
     </div>
   );
 }
+

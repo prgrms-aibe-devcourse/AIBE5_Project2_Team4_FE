@@ -55,7 +55,6 @@ body {
   background: transparent;
   border: none;
   color: var(--text-secondary);
-  font-size: 1.1rem;
   width: 32px;
   height: 28px;
   border-radius: 6px;
@@ -64,7 +63,6 @@ body {
   align-items: center;
   justify-content: center;
   transition: all 0.15s ease;
-  line-height: 1;
 }
 
 .fl-view-btn:hover { color: var(--text-light); }
@@ -683,4 +681,59 @@ body {
   .fl-card::after {
     opacity: 0.18;
   }
+}
+
+/* ─── pagination ─────────────────────────────────────── */
+.fl-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 2rem;
+}
+
+.fl-page-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid #3a3a3a;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.fl-page-btn:hover:not(:disabled) {
+  border-color: #555;
+  color: var(--text-light);
+}
+
+.fl-page-btn.active {
+  border-color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.12);
+  color: var(--green-accent);
+  font-weight: 600;
+}
+
+.fl-page-btn:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.fl-page-btn--arrow {
+  width: auto;
+  padding: 0 0.75rem;
+  font-size: 0.9rem;
+}
+
+.fl-page-ellipsis {
+  color: var(--text-secondary);
+  padding: 0 0.25rem;
+  line-height: 36px;
+  font-size: 0.875rem;
 }
