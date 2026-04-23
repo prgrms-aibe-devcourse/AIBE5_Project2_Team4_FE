@@ -111,6 +111,10 @@ export async function signupSession(request: authApi.AuthSignupRequest): Promise
   return authApi.signup(request);
 }
 
+export async function forgotPasswordSession(email: string): Promise<void> {
+  await authApi.forgotPassword({ email });
+}
+
 export async function logoutSession(): Promise<void> {
   try {
     if (hasAnyToken()) {

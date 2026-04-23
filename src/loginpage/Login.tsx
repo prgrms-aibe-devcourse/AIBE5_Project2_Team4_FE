@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import './login.css';
 import { startKakaoAuthorization } from '../auth/kakaoOAuth';
-import { login } from '../store/appAuth';
+import { forgotPassword, login } from '../store/appAuth';
 import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
+import { ApiError } from '../api/types';
 
-function getErrorMessage(error: unknown): string {
+function getErrorMessage(error: unknown, fallback = '로그인에 실패했습니다.'): string {
   if (error instanceof Error && error.message) {
     return error.message;
   }
 
-  return '로그인에 실패했습니다.';
+  return fallback;
+}
+
+function getFindPasswordErrorMessage(error: unknown): string {
+  if (error instanceof ApiError && (error.status === 404 || error.code.includes('NOT_FOUND'))) {
+    return '존재하지 않는 이메일입니다.';
+  }
+
+  return getErrorMessage(error, '비밀번호 재설정 안내 발송에 실패했습니다.');
 }
 
 export default function Login() {
@@ -21,6 +30,8 @@ export default function Login() {
   const [view, setView] = useState<'login' | 'findPassword'>('login');
   const [findEmail, setFindEmail] = useState('');
   const [findMessage, setFindMessage] = useState('');
+  const [findMessageType, setFindMessageType] = useState<'error' | 'success'>('error');
+  const [findSubmitting, setFindSubmitting] = useState(false);
 
   useEffect(() => {
     const syncTheme = () => {
@@ -66,14 +77,28 @@ export default function Login() {
     setThemeState(nextTheme);
   };
 
-  function handleFindPassword(event: React.FormEvent) {
+  async function handleFindPassword(event: React.FormEvent) {
     event.preventDefault();
-    if (!findEmail.trim()) {
+    const normalizedEmail = findEmail.trim();
+    if (!normalizedEmail) {
+      setFindMessageType('error');
       setFindMessage('이메일을 입력해 주세요.');
       return;
     }
 
-    setFindMessage('비밀번호 찾기 API가 아직 제공되지 않습니다. 관리자에게 문의해 주세요.');
+    setFindMessage('');
+    setFindSubmitting(true);
+
+    try {
+      await forgotPassword(normalizedEmail);
+      setFindMessageType('success');
+      setFindMessage('입력한 이메일로 비밀번호 재설정 안내를 보냈습니다. 메일함을 확인해 주세요.');
+    } catch (caughtError) {
+      setFindMessageType('error');
+      setFindMessage(getFindPasswordErrorMessage(caughtError));
+    } finally {
+      setFindSubmitting(false);
+    }
   }
 
   return (
@@ -119,6 +144,7 @@ export default function Login() {
                     onClick={() => {
                       setView('findPassword');
                       setFindMessage('');
+                      setFindMessageType('error');
                       setFindEmail('');
                     }}
                   >
@@ -183,15 +209,25 @@ export default function Login() {
                   type="email"
                   placeholder="이메일을 입력하세요"
                   value={findEmail}
-                  onChange={(event) => setFindEmail(event.target.value)}
+                  onChange={(event) => {
+                    setFindEmail(event.target.value);
+                    setFindMessage('');
+                    setFindMessageType('error');
+                  }}
                   required
                   autoFocus
                 />
               </div>
 
-              {findMessage && <p className="login-error">{findMessage}</p>}
+              {findMessage && (
+                <p className={findMessageType === 'success' ? 'login-success' : 'login-error'}>
+                  {findMessage}
+                </p>
+              )}
 
-              <button type="submit" className="login-btn">재설정 안내 확인</button>
+              <button type="submit" className="login-btn" disabled={findSubmitting}>
+                {findSubmitting ? '발송 중...' : '이메일 발송'}
+              </button>
             </form>
 
             <button
@@ -200,6 +236,7 @@ export default function Login() {
               onClick={() => {
                 setView('login');
                 setFindMessage('');
+                setFindMessageType('error');
                 setFindEmail('');
               }}
             >

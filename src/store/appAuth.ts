@@ -1,6 +1,7 @@
 import {
   bootstrapAuthSession,
   clearSession,
+  forgotPasswordSession,
   getCurrentUser,
   kakaoLoginSession,
   loginSession,
@@ -48,6 +49,10 @@ export function loginWithKakaoAuthorizationCode(authorizationCode: string): Prom
 
 export function signup(request: AuthSignupRequest): Promise<AuthSignupResponse> {
   return signupSession(request);
+}
+
+export function forgotPassword(email: string): Promise<void> {
+  return forgotPasswordSession(email);
 }
 
 export type PortfolioStatus = 'PENDING' | 'APPROVED' | 'REJECTED';

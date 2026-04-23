@@ -243,6 +243,13 @@ body {
   margin-top: -0.25rem;
 }
 
+.login-success {
+  font-size: 0.85rem;
+  color: var(--green-accent);
+  text-align: center;
+  margin-top: -0.25rem;
+}
+
 .test-account-btn {
   display: flex;
   align-items: center;
