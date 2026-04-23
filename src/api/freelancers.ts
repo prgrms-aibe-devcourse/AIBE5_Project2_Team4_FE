@@ -58,8 +58,17 @@ export interface FreelancerFileResponse {
   uploadedAt: string;
 }
 
-export function getFreelancers(params: { page?: number; size?: number } = {}): Promise<PageResponse<PublicFreelancerSummaryResponse>> {
+export function getFreelancers(params: {
+  keyword?: string;
+  projectType?: string;
+  region?: string;
+  page?: number;
+  size?: number;
+} = {}): Promise<PageResponse<PublicFreelancerSummaryResponse>> {
   const search = new URLSearchParams();
+  if (params.keyword) search.set('keyword', params.keyword);
+  if (params.projectType) search.set('projectType', params.projectType);
+  if (params.region) search.set('region', params.region);
   if (params.page != null) search.set('page', String(params.page));
   if (params.size != null) search.set('size', String(params.size));
   const query = search.toString();

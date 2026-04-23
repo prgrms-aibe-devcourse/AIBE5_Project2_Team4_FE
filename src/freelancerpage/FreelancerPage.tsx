@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState, type PointerEvent as ReactPointerEvent } from 'react';
+import { useEffect, useState, type PointerEvent as ReactPointerEvent } from 'react';
 import './freelancer.css';
 import AppHeader from '../components/AppHeader';
 import { getFreelancers, type PublicFreelancerSummaryResponse } from '../api/freelancers';
-import { getProjectTypeCodes, getRegionCodes } from '../api/codes';
+import { getProjectTypeCodes, getRegionCodes, type CodeLookupResponse } from '../api/codes';
 import { getErrorMessage } from '../lib/errors';
 import { labelOf } from '../lib/referenceData';
 
@@ -50,9 +50,12 @@ export default function FreelancerPage() {
   const [hasNext, setHasNext] = useState(false);
   const [freelancers, setFreelancers] = useState<PublicFreelancerSummaryResponse[]>([]);
   const [search, setSearch] = useState('');
-  const [skillFilter, setSkillFilter] = useState('ALL');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+  const [skillFilter, setSkillFilter] = useState('');
+  const [regionFilter, setRegionFilter] = useState('');
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [projectTypeOptions, setProjectTypeOptions] = useState<Array<{ code: string; name: string }>>([]);
+  const [regionFilterOptions, setRegionFilterOptions] = useState<CodeLookupResponse[]>([]);
   const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
 
@@ -67,6 +70,9 @@ export default function FreelancerPage() {
         setProjectTypeOptions(projectTypes.map(({ code, name }) => ({ code, name })));
         setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
         setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
+
+        const sidoOptions = regions.filter((r) => r.regionLevel === 1);
+        setRegionFilterOptions(sidoOptions);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프리랜서 기준 코드를 불러오지 못했습니다.'));
       }
@@ -76,12 +82,26 @@ export default function FreelancerPage() {
   }, []);
 
   useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(search.trim());
+      setPage(0);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [search]);
+
+  useEffect(() => {
     const loadFreelancers = async () => {
       setLoading(true);
       setError('');
 
       try {
-        const response = await getFreelancers({ page, size: 24 });
+        const response = await getFreelancers({
+          keyword: debouncedSearch || undefined,
+          projectType: skillFilter || undefined,
+          region: regionFilter || undefined,
+          page,
+          size: 24,
+        });
         setFreelancers(response.content);
         setTotalPages(response.totalPages);
         setHasNext(response.hasNext);
@@ -93,31 +113,7 @@ export default function FreelancerPage() {
     };
 
     void loadFreelancers();
-  }, [page]);
-
-  const filtered = useMemo(() => {
-    const keyword = search.trim().toLowerCase();
-
-    return freelancers.filter((freelancer) => {
-      const skillMatched = skillFilter === 'ALL' || freelancer.projectTypeCodes.includes(skillFilter);
-      if (!skillMatched) {
-        return false;
-      }
-
-      if (!keyword) {
-        return true;
-      }
-
-      const searchable = [
-        freelancer.name,
-        freelancer.intro ?? '',
-        ...freelancer.projectTypeCodes.map((code) => labelOf(projectTypeMap, code)),
-        ...freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)),
-      ].join(' ').toLowerCase();
-
-      return searchable.includes(keyword);
-    });
-  }, [freelancers, projectTypeMap, regionMap, search, skillFilter]);
+  }, [page, debouncedSearch, skillFilter, regionFilter]);
 
   return (
     <div className="freelancer-page">
@@ -145,8 +141,8 @@ export default function FreelancerPage() {
           <div className="fl-skill-filters">
             <button
               type="button"
-              className={`fl-filter-chip${skillFilter === 'ALL' ? ' active' : ''}`}
-              onClick={() => setSkillFilter('ALL')}
+              className={`fl-filter-chip${skillFilter === '' ? ' active' : ''}`}
+              onClick={() => { setSkillFilter(''); setPage(0); }}
             >
               전체
             </button>
@@ -155,13 +151,40 @@ export default function FreelancerPage() {
                 key={option.code}
                 type="button"
                 className={`fl-filter-chip${skillFilter === option.code ? ' active' : ''}`}
-                onClick={() => setSkillFilter(option.code)}
+                onClick={() => { setSkillFilter(option.code); setPage(0); }}
               >
                 {option.name}
               </button>
             ))}
           </div>
 
+        </div>
+
+        {regionFilterOptions.length > 0 && (
+          <div className="fl-filter-bar fl-filter-bar--region">
+            <div className="fl-skill-filters">
+              <button
+                type="button"
+                className={`fl-filter-chip${regionFilter === '' ? ' active' : ''}`}
+                onClick={() => { setRegionFilter(''); setPage(0); }}
+              >
+                전국
+              </button>
+              {regionFilterOptions.map((option) => (
+                <button
+                  key={option.code}
+                  type="button"
+                  className={`fl-filter-chip${regionFilter === option.code ? ' active' : ''}`}
+                  onClick={() => { setRegionFilter(option.code); setPage(0); }}
+                >
+                  {option.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="fl-filter-bar fl-filter-bar--view">
           <div className="fl-view-toggle">
             <button
               type="button"
@@ -200,11 +223,11 @@ export default function FreelancerPage() {
 
         {loading ? (
           <div className="fl-empty">프리랜서 목록을 불러오는 중입니다.</div>
-        ) : filtered.length === 0 ? (
+        ) : freelancers.length === 0 ? (
           <div className="fl-empty">조건에 맞는 프리랜서가 없습니다.</div>
         ) : (
           <ul className={viewMode === 'grid' ? 'fl-grid' : 'fl-list'}>
-            {filtered.map((freelancer) => (
+            {freelancers.map((freelancer) => (
               <li
                 key={freelancer.freelancerProfileId}
                 className={`fl-card${viewMode === 'grid' ? ' fl-card--grid' : ''}`}

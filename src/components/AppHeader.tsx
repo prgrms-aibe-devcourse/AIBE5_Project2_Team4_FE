@@ -4,6 +4,7 @@ import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
 import { canSendAnnouncement } from '../store/accessControl';
 import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 import {
+  deleteNotification,
   getNotifications,
   markAllNotificationsRead,
   markNotificationRead,
@@ -175,6 +176,11 @@ export default function AppHeader({ activePage }: HeaderProps) {
     await refreshNotifications(user);
   }
 
+  async function handleDeleteNotification(notificationId: number) {
+    await deleteNotification(notificationId);
+    await refreshNotifications(user);
+  }
+
   return (
     <nav className="header">
       <div className="header-container">
@@ -235,19 +241,26 @@ export default function AppHeader({ activePage }: HeaderProps) {
                 ) : (
                   <div className="header-notification-list">
                     {notifications.map((notification) => (
-                      <button
-                        key={notification.notificationId}
-                        type="button"
-                        className={`header-notification-item${notification.isRead ? '' : ' unread'}`}
-                        onClick={() => void handleNotificationSelect(notification)}
-                      >
-                        <div className="header-notification-top">
-                          <strong>{notification.title}</strong>
-                          <span>{formatNotificationTime(notification.createdAt)}</span>
-                        </div>
-                        <p className="header-notification-message">{notification.content}</p>
-                        <span className="header-notification-meta">{getNotificationMeta(notification)}</span>
-                      </button>
+                      <div key={notification.notificationId} className="header-notification-row">
+                        <button
+                          type="button"
+                          className={`header-notification-item${notification.isRead ? '' : ' unread'}`}
+                          onClick={() => void handleNotificationSelect(notification)}
+                        >
+                          <div className="header-notification-top">
+                            <strong>{notification.title}</strong>
+                            <span>{formatNotificationTime(notification.createdAt)}</span>
+                          </div>
+                          <p className="header-notification-message">{notification.content}</p>
+                          <span className="header-notification-meta">{getNotificationMeta(notification)}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="header-notification-delete"
+                          aria-label="알림 삭제"
+                          onClick={() => void handleDeleteNotification(notification.notificationId)}
+                        >×</button>
+                      </div>
                     ))}
                   </div>
                 )}

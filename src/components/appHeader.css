@@ -419,3 +419,34 @@
     right: -0.5rem;
   }
 }
+
+.header-notification-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+}
+
+.header-notification-row .header-notification-item {
+  flex: 1;
+}
+
+.header-notification-delete {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  margin-top: 0.5rem;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  line-height: 1;
+}
+
+.header-notification-delete:hover {
+  border-color: #555;
+  color: var(--text-light);
+  background: var(--soft-overlay);
+}

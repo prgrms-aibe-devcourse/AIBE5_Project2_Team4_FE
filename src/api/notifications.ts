@@ -66,3 +66,9 @@ export function markAllNotificationsRead(): Promise<NotificationBulkReadResponse
     method: 'PATCH',
   });
 }
+
+export function deleteNotification(notificationId: number): Promise<void> {
+  return requestJson<void>(`/api/v1/notifications/${notificationId}`, {
+    method: 'DELETE',
+  });
+}

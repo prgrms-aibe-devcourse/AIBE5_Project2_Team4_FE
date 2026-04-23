@@ -737,3 +737,12 @@ body {
   line-height: 36px;
   font-size: 0.875rem;
 }
+
+.fl-filter-bar--region {
+  margin-top: -1rem;
+}
+
+.fl-filter-bar--view {
+  justify-content: flex-end;
+  margin-bottom: 1.25rem;
+}
