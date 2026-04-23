@@ -3,7 +3,7 @@ import './mypage.css';
 import AppHeader from '../components/AppHeader';
 import { bootstrapSession, getUser, setUser, type User } from '../store/appAuth';
 import { canManageVerification, canModerateReviews, canModifyOwnReview } from '../store/accessControl';
-import { resolveApiAssetUrl } from '../api/client';
+import { downloadFile, openFileInNewTab } from '../api/files';
 import {
   approveAdminVerification,
   blindAdminReview,
@@ -557,6 +557,26 @@ export default function MyPage2() {
     }
   }
 
+  async function handleFileView(fileUrl: string) {
+    setError('');
+
+    try {
+      await openFileInNewTab(fileUrl);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '파일을 열지 못했습니다.'));
+    }
+  }
+
+  async function handleFileDownload(fileUrl: string) {
+    setError('');
+
+    try {
+      await downloadFile(fileUrl);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '파일을 다운로드하지 못했습니다.'));
+    }
+  }
+
   async function handleCreateVerification() {
     setSaving(true);
     setError('');
@@ -1086,8 +1106,8 @@ export default function MyPage2() {
                         <p className="admin-subtext">{formatDateTime(file.uploadedAt)}</p>
                       </div>
                       <div className="admin-item-right">
-                        <a className="btn-edit" href={resolveApiAssetUrl(file.viewUrl)} target="_blank" rel="noreferrer">보기</a>
-                        <a className="btn-edit" href={resolveApiAssetUrl(file.downloadUrl)}>다운로드</a>
+                        <button type="button" className="btn-edit" onClick={() => void handleFileView(file.viewUrl)}>보기</button>
+                        <button type="button" className="btn-edit" onClick={() => void handleFileDownload(file.downloadUrl)}>다운로드</button>
                         <button className="btn-cancel" onClick={() => void handlePortfolioDelete(file.fileId)}>삭제</button>
                       </div>
                     </li>
@@ -1161,8 +1181,8 @@ export default function MyPage2() {
                           <p className="admin-subtext">{formatDateTime(file.uploadedAt)}</p>
                         </div>
                         <div className="admin-item-right">
-                          <a className="btn-edit" href={resolveApiAssetUrl(file.viewUrl)} target="_blank" rel="noreferrer">보기</a>
-                          <a className="btn-edit" href={resolveApiAssetUrl(file.downloadUrl)}>다운로드</a>
+                          <button type="button" className="btn-edit" onClick={() => void handleFileView(file.viewUrl)}>보기</button>
+                          <button type="button" className="btn-edit" onClick={() => void handleFileDownload(file.downloadUrl)}>다운로드</button>
                           <button className="btn-cancel" onClick={() => void handleVerificationFileDelete(file.verificationFileId)}>삭제</button>
                         </div>
                       </li>
@@ -1305,6 +1325,8 @@ export default function MyPage2() {
               onSelectVerification={(verificationId) => void handleSelectAdminVerification(verificationId)}
               onApproveVerification={(verificationId) => void handleApproveVerification(verificationId)}
               onRejectVerification={(verificationId) => void handleRejectVerification(verificationId)}
+              onViewFile={(fileUrl) => void handleFileView(fileUrl)}
+              onDownloadFile={(fileUrl) => void handleFileDownload(fileUrl)}
             />
           </>
         )}

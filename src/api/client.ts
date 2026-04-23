@@ -11,6 +11,12 @@ interface RequestOptions {
   retryOnAuthFailure?: boolean;
 }
 
+export interface ApiBlobResponse {
+  blob: Blob;
+  filename?: string;
+  contentType?: string;
+}
+
 let unauthorizedHandler: (() => Promise<boolean>) | null = null;
 
 export function registerUnauthorizedHandler(handler: (() => Promise<boolean>) | null): void {
@@ -100,8 +106,29 @@ function toApiError(response: Response, payload: unknown, requestPath: string): 
   });
 }
 
-export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const requestPath = path.startsWith('http') ? new URL(path).pathname : path;
+function parseFilenameFromContentDisposition(contentDisposition: string | null): string | undefined {
+  if (!contentDisposition) {
+    return undefined;
+  }
+
+  const encodedFilename = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (encodedFilename) {
+    try {
+      return decodeURIComponent(encodedFilename.trim().replace(/^"|"$/g, ''));
+    } catch {
+      return encodedFilename;
+    }
+  }
+
+  const quotedFilename = contentDisposition.match(/filename="([^"]+)"/i)?.[1];
+  if (quotedFilename) {
+    return quotedFilename;
+  }
+
+  return contentDisposition.match(/filename=([^;]+)/i)?.[1]?.trim();
+}
+
+function buildRequestInit(options: RequestOptions): RequestInit {
   const headers = buildHeaders(options);
   const init: RequestInit = {
     method: options.method ?? 'GET',
@@ -118,6 +145,13 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
       init.body = JSON.stringify(options.body);
     }
   }
+
+  return init;
+}
+
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  const requestPath = path.startsWith('http') ? new URL(path).pathname : path;
+  const init = buildRequestInit(options);
 
   const response = await fetch(buildApiUrl(path), init);
 
@@ -150,4 +184,29 @@ export async function requestJson<T>(path: string, options: RequestOptions = {})
   }
 
   return payload as T;
+}
+
+export async function requestBlob(path: string, options: RequestOptions = {}): Promise<ApiBlobResponse> {
+  const requestPath = path.startsWith('http') ? new URL(path).pathname : path;
+  const response = await fetch(buildApiUrl(path), buildRequestInit(options));
+
+  if (response.status === 401 && options.retryOnAuthFailure !== false && unauthorizedHandler && getRefreshToken()) {
+    const refreshed = await unauthorizedHandler();
+    if (refreshed) {
+      return requestBlob(path, { ...options, retryOnAuthFailure: false });
+    }
+  }
+
+  if (!response.ok) {
+    const payload = response.headers.get('content-type')?.includes('application/json')
+      ? await parseJson(response)
+      : await response.text();
+    throw toApiError(response, payload, requestPath);
+  }
+
+  return {
+    blob: await response.blob(),
+    filename: parseFilenameFromContentDisposition(response.headers.get('content-disposition')),
+    contentType: response.headers.get('content-type') ?? undefined,
+  };
 }

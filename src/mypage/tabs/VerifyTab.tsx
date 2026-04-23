@@ -2,7 +2,6 @@ import type {
   AdminVerificationDetailResponse,
   AdminVerificationListItemResponse,
 } from '../../api/admin';
-import { resolveApiAssetUrl } from '../../api/client';
 import { formatDateTime } from '../../lib/referenceData';
 import { STATUS_LABEL, type VerifyStatus } from './verifyTabShared';
 
@@ -14,6 +13,8 @@ interface Props {
   onSelectVerification: (verificationId: number) => void;
   onApproveVerification: (verificationId: number) => void;
   onRejectVerification: (verificationId: number) => void;
+  onViewFile: (fileUrl: string) => void;
+  onDownloadFile: (fileUrl: string) => void;
 }
 
 export default function VerifyTab({
@@ -24,6 +25,8 @@ export default function VerifyTab({
   onSelectVerification,
   onApproveVerification,
   onRejectVerification,
+  onViewFile,
+  onDownloadFile,
 }: Props) {
   const filtered = verifyFilter === 'ALL'
     ? verifications
@@ -127,15 +130,20 @@ export default function VerifyTab({
                         <div className="verify-email">{formatDateTime(file.uploadedAt)}</div>
                       </div>
                       <div className="verify-actions">
-                        <a
+                        <button
+                          type="button"
                           className="verify-btn verify-btn--detail"
-                          href={resolveApiAssetUrl(file.viewUrl)}
-                          target="_blank"
-                          rel="noreferrer"
+                          onClick={() => onViewFile(file.viewUrl)}
                         >
                           보기
-                        </a>
-                        <a className="verify-btn verify-btn--approve" href={resolveApiAssetUrl(file.downloadUrl)}>다운로드</a>
+                        </button>
+                        <button
+                          type="button"
+                          className="verify-btn verify-btn--approve"
+                          onClick={() => onDownloadFile(file.downloadUrl)}
+                        >
+                          다운로드
+                        </button>
                       </div>
                     </li>
                   ))}
