@@ -367,6 +367,28 @@ body {
   font-weight: 500;
 }
 
+.form-group select {
+  background-color: var(--dark-bg);
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  color: var(--text-light);
+  font-size: 0.9rem;
+  font-family: inherit;
+  outline: none;
+  transition: border-color 0.2s ease;
+  width: 100%;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23888' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 1rem center;
+}
+
+.form-group select:focus { border-color: var(--green-accent); }
+.form-group select option { background-color: #2a2a2a; color: var(--text-light); }
+.form-group select option[value=""] { color: #555; }
+
 .form-group input,
 .form-group textarea {
   background-color: var(--dark-bg);

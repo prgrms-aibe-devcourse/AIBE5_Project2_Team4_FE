@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { FormEvent } from 'react';
+import { sortSido } from '../lib/referenceData';
 
 export interface ProjectFormValues {
   title: string;
@@ -24,6 +25,7 @@ interface Props {
   form: ProjectFormValues;
   projectTypeOptions: Option[];
   regionOptions: Option[];
+  error?: string;
   onClose: () => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   onFieldChange: (field: keyof ProjectFormValues, value: string) => void;
@@ -34,14 +36,17 @@ export default function ProjectFormModal({
   form,
   projectTypeOptions,
   regionOptions,
+  error,
   onClose,
   onSubmit,
   onFieldChange,
 }: Props) {
   const isEdit = mode === 'edit';
+  const nowMin = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
-  const topRegions = regionOptions.filter((r) => !r.parentRegionCode);
-  const allSubRegions = regionOptions.filter((r) => !!r.parentRegionCode);
+  const sidoOnly = regionOptions.filter((r) => r.regionLevel === 1);
+  const topRegions = sortSido(sidoOnly.length > 0 ? sidoOnly : regionOptions.filter((r) => !r.parentRegionCode));
+  const allSubRegions = regionOptions.filter((r) => r.regionLevel === 2 || (r.regionLevel == null && !!r.parentRegionCode));
 
   const selectedTopCode = (() => {
     if (!form.serviceRegionCode) return '';
@@ -91,18 +96,16 @@ export default function ProjectFormModal({
 
           <div className="form-group">
             <label>서비스 유형</label>
-            <div className="type-selector">
+            <select
+              value={form.projectTypeCode}
+              onChange={(e) => onFieldChange('projectTypeCode', e.target.value)}
+              required
+            >
+              <option value="">서비스 유형을 선택해 주세요</option>
               {projectTypeOptions.map((option) => (
-                <button
-                  key={option.code}
-                  type="button"
-                  className={`type-btn${form.projectTypeCode === option.code ? ' selected' : ''}`}
-                  onClick={() => onFieldChange('projectTypeCode', option.code)}
-                >
-                  {option.name}
-                </button>
+                <option key={option.code} value={option.code}>{option.name}</option>
               ))}
-            </div>
+            </select>
           </div>
 
           <div className="form-group">
@@ -122,6 +125,13 @@ export default function ProjectFormModal({
 
             {openParent && subRegions.length > 0 && (
               <div className="type-selector region-sub-selector">
+                <button
+                  type="button"
+                  className={`type-btn type-btn--sub${form.serviceRegionCode === openParent ? ' selected' : ''}`}
+                  onClick={() => onFieldChange('serviceRegionCode', openParent)}
+                >
+                  전체
+                </button>
                 {subRegions.map((sub) => (
                   <button
                     key={sub.code}
@@ -142,7 +152,13 @@ export default function ProjectFormModal({
               <input
                 type="datetime-local"
                 value={form.requestedStartAt}
+                min={nowMin}
                 onChange={(event) => onFieldChange('requestedStartAt', event.target.value)}
+                onBlur={(event) => {
+                  if (event.target.value && event.target.value < nowMin) {
+                    onFieldChange('requestedStartAt', nowMin);
+                  }
+                }}
                 required
               />
             </div>
@@ -151,7 +167,14 @@ export default function ProjectFormModal({
               <input
                 type="datetime-local"
                 value={form.requestedEndAt}
+                min={form.requestedStartAt || nowMin}
                 onChange={(event) => onFieldChange('requestedEndAt', event.target.value)}
+                onBlur={(event) => {
+                  const minEnd = form.requestedStartAt || nowMin;
+                  if (event.target.value && event.target.value < minEnd) {
+                    onFieldChange('requestedEndAt', minEnd);
+                  }
+                }}
                 required
               />
             </div>
@@ -189,6 +212,9 @@ export default function ProjectFormModal({
             />
           </div>
 
+          {error && (
+            <p style={{ color: '#e07070', fontSize: '0.875rem', margin: '0.25rem 0' }}>{error}</p>
+          )}
           <button type="submit" className="btn-create form-submit">
             {isEdit ? '수정 저장' : '프로젝트 등록'}
           </button>

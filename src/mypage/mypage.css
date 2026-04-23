@@ -2058,47 +2058,4 @@ body {
   gap: 0.6rem;
 }
 
-.mp-chip-group--sigungu {
-  padding: 0.5rem 0.75rem;
-  background: rgba(255,255,255,0.03);
-  border: 1px solid #2e2e2e;
-  border-radius: 8px;
-}
 
-.mp-chip--active-sido {
-  border-color: var(--green-accent);
-  color: var(--green-accent);
-  font-weight: 600;
-}
-
-.mp-selected-regions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.35rem;
-  margin-top: 0.25rem;
-}
-
-.mp-selected-tag {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  background: rgba(155,168,130,0.15);
-  border: 1px solid var(--green-accent);
-  border-radius: 20px;
-  color: var(--green-accent);
-  font-size: 0.78rem;
-  padding: 0.2rem 0.6rem;
-}
-
-.mp-selected-tag-remove {
-  background: none;
-  border: none;
-  color: var(--green-accent);
-  cursor: pointer;
-  font-size: 0.9rem;
-  padding: 0;
-  line-height: 1;
-}
-.mp-selected-tag-remove:hover {
-  color: var(--text-light);
-}

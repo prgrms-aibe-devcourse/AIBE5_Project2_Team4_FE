@@ -69,7 +69,7 @@ import {
 } from '../api/verifications';
 import { getMyPage, updateMyProfile, type UserMyPageResponse } from '../api/users';
 import { getErrorMessage } from '../lib/errors';
-import { formatDateTime, labelOf } from '../lib/referenceData';
+import { formatDateTime, labelOf, sortSido } from '../lib/referenceData';
 import VerifyTab from './tabs/VerifyTab';
 import ReviewsTab from './tabs/ReviewsTab';
 import ReportsTab from './tabs/ReportsTab';
@@ -203,7 +203,6 @@ export default function MyPage2() {
   const [freelancerForm, setFreelancerForm] = useState<FreelancerFormState>(EMPTY_FREELANCER_FORM);
   const [applyForm, setApplyForm] = useState<FreelancerFormState>(EMPTY_FREELANCER_FORM);
   const [applyFiles, setApplyFiles] = useState<File[]>([]);
-  const [applySelectedSido, setApplySelectedSido] = useState<string | null>(null);
   const [showMateApplyForm, setShowMateApplyForm] = useState(false);
   const [summary, setSummary] = useState<UserMyPageResponse | null>(null);
   const [reviews, setReviews] = useState<ReviewSummaryResponse[]>([]);
@@ -1196,77 +1195,24 @@ export default function MyPage2() {
                     </div>
                   </div>
                   <div className="account-field">
-                    <label>활동 지역 (복수 선택)</label>
+                    <label>활동 지역 (최대 5개 선택)</label>
                     <div className="mp-region-selector">
-                      {regionOptions.some((o) => o.regionLevel === 1) ? (
-                        <>
-                          <div className="mp-chip-group mp-chip-group--sido">
-                            {regionOptions.filter((o) => o.regionLevel === 1).map((sido) => (
-                              <button
-                                key={sido.code}
-                                type="button"
-                                className={`mp-chip${applySelectedSido === sido.code ? ' mp-chip--active-sido' : ''}`}
-                                onClick={() => setApplySelectedSido((prev) => prev === sido.code ? null : sido.code)}
-                              >
-                                {sido.name}
-                              </button>
-                            ))}
-                          </div>
-                          {applySelectedSido && (
-                            <div className="mp-chip-group mp-chip-group--sigungu">
-                              {regionOptions.filter((o) => o.regionLevel === 2 && o.parentRegionCode === applySelectedSido).map((sigungu) => (
-                                <button
-                                  key={sigungu.code}
-                                  type="button"
-                                  className={`mp-chip${applyForm.activityRegionCodes.includes(sigungu.code) ? ' mp-chip--selected' : ''}`}
-                                  onClick={() => setApplyForm((current) => ({
-                                    ...current,
-                                    activityRegionCodes: toggleSelection(current.activityRegionCodes, sigungu.code),
-                                  }))}
-                                >
-                                  {applyForm.activityRegionCodes.includes(sigungu.code) ? `✓ ${sigungu.name}` : sigungu.name}
-                                </button>
-                              ))}
-                            </div>
-                          )}
-                        </>
-                      ) : (
-                        <div className="mp-chip-group">
-                          {regionOptions.map((option) => (
-                            <button
-                              key={option.code}
-                              type="button"
-                              className={`mp-chip${applyForm.activityRegionCodes.includes(option.code) ? ' mp-chip--selected' : ''}`}
-                              onClick={() => setApplyForm((current) => ({
-                                ...current,
-                                activityRegionCodes: toggleSelection(current.activityRegionCodes, option.code),
-                              }))}
-                            >
-                              {applyForm.activityRegionCodes.includes(option.code) ? `✓ ${option.name}` : option.name}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {applyForm.activityRegionCodes.length > 0 && (
-                        <div className="mp-selected-regions">
-                          {applyForm.activityRegionCodes.map((code) => {
-                            const region = regionOptions.find((o) => o.code === code);
-                            return region ? (
-                              <span key={code} className="mp-selected-tag">
-                                {region.name}
-                                <button
-                                  type="button"
-                                  className="mp-selected-tag-remove"
-                                  onClick={() => setApplyForm((current) => ({
-                                    ...current,
-                                    activityRegionCodes: current.activityRegionCodes.filter((c) => c !== code),
-                                  }))}
-                                >×</button>
-                              </span>
-                            ) : null;
-                          })}
-                        </div>
-                      )}
+                      <div className="mp-chip-group">
+                        {sortSido(regionOptions.filter((o) => !o.parentRegionCode)).map((region) => (
+                          <button
+                            key={region.code}
+                            type="button"
+                            className={`mp-chip${applyForm.activityRegionCodes.includes(region.code) ? ' mp-chip--selected' : ''}`}
+                            onClick={() => setApplyForm((current) => {
+                              const already = current.activityRegionCodes.includes(region.code);
+                              if (!already && current.activityRegionCodes.length >= 5) return current;
+                              return { ...current, activityRegionCodes: toggleSelection(current.activityRegionCodes, region.code) };
+                            })}
+                          >
+                            {applyForm.activityRegionCodes.includes(region.code) ? `✓ ${region.name}` : region.name}
+                          </button>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   <div className="account-field">

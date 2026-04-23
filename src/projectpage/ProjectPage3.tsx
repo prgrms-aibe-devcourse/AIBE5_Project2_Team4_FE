@@ -136,6 +136,8 @@ export default function ProjectPage3() {
   const [selectedReview, setSelectedReview] = useState<ReviewDetailResponse | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [createError, setCreateError] = useState('');
+  const [editError, setEditError] = useState('');
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [form, setForm] = useState<ProjectFormValues>(EMPTY_FORM);
   const [editForm, setEditForm] = useState<ProjectFormValues>(EMPTY_FORM);
@@ -271,7 +273,7 @@ export default function ProjectPage3() {
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setMutationLoading(true);
-    setError('');
+    setCreateError('');
 
     try {
       await createProject(toProjectRequest(form));
@@ -279,7 +281,7 @@ export default function ProjectPage3() {
       setForm(EMPTY_FORM);
       setShowCreateModal(false);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, '프로젝트 생성에 실패했습니다.'));
+      setCreateError(getErrorMessage(caughtError, '프로젝트 생성에 실패했습니다.'));
     } finally {
       setMutationLoading(false);
     }
@@ -301,7 +303,7 @@ export default function ProjectPage3() {
     }
 
     setMutationLoading(true);
-    setError('');
+    setEditError('');
 
     try {
       const updated = await updateProject(selectedProject.projectId, toProjectRequest(editForm));
@@ -309,7 +311,7 @@ export default function ProjectPage3() {
       await refreshUserProjects();
       setShowEditModal(false);
     } catch (caughtError) {
-      setError(getErrorMessage(caughtError, '프로젝트 수정에 실패했습니다.'));
+      setEditError(getErrorMessage(caughtError, '프로젝트 수정에 실패했습니다.'));
     } finally {
       setMutationLoading(false);
     }
@@ -459,7 +461,7 @@ export default function ProjectPage3() {
             </p>
           </div>
           {isUser && (
-            <button type="button" className="btn-create" onClick={() => setShowCreateModal(true)}>
+            <button type="button" className="btn-create" onClick={() => { setForm(EMPTY_FORM); setCreateError(''); setShowCreateModal(true); }}>
               + 새 프로젝트
             </button>
           )}
@@ -635,7 +637,8 @@ export default function ProjectPage3() {
           form={editForm}
           projectTypeOptions={projectTypeOptions}
           regionOptions={regionOptions}
-          onClose={() => setShowEditModal(false)}
+          error={editError}
+          onClose={() => { setShowEditModal(false); setEditError(''); }}
           onSubmit={handleEditSubmit}
           onFieldChange={(field, value) => setEditForm((prev) => ({ ...prev, [field]: value }))}
         />
@@ -647,7 +650,8 @@ export default function ProjectPage3() {
           form={form}
           projectTypeOptions={projectTypeOptions}
           regionOptions={regionOptions}
-          onClose={() => setShowCreateModal(false)}
+          error={createError}
+          onClose={() => { setShowCreateModal(false); setCreateError(''); }}
           onSubmit={handleCreate}
           onFieldChange={(field, value) => setForm((prev) => ({ ...prev, [field]: value }))}
         />

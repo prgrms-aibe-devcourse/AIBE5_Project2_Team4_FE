@@ -48,6 +48,19 @@ export async function loadReferenceMaps(): Promise<{
   return { projectTypes, regions, timeSlots, reviewTags };
 }
 
+function sidoPriority(name: string): number {
+  if (name.includes('서울')) return 0;
+  if (name.includes('경기')) return 1;
+  if (name.includes('광역시')) return 2;
+  if (name.includes('특별자치시')) return 3;
+  if (name.includes('특별자치도')) return 4;
+  return 5;
+}
+
+export function sortSido<T extends { name: string }>(regions: T[]): T[] {
+  return [...regions].sort((a, b) => sidoPriority(a.name) - sidoPriority(b.name));
+}
+
 export function labelOf(map: CodeMap | null | undefined, code: string | null | undefined): string {
   if (!code) {
     return '-';

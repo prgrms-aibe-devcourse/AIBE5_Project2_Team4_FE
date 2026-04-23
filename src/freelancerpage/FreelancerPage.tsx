@@ -4,7 +4,7 @@ import AppHeader from '../components/AppHeader';
 import { getFreelancers, type PublicFreelancerSummaryResponse } from '../api/freelancers';
 import { getProjectTypeCodes, getRegionCodes, type CodeLookupResponse } from '../api/codes';
 import { getErrorMessage } from '../lib/errors';
-import { labelOf } from '../lib/referenceData';
+import { labelOf, sortSido } from '../lib/referenceData';
 
 let rafPending = false;
 
@@ -71,7 +71,7 @@ export default function FreelancerPage() {
         setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
         setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
 
-        const sidoOptions = regions.filter((r) => r.regionLevel === 1);
+        const sidoOptions = sortSido(regions.filter((r) => r.regionLevel === 1));
         setRegionFilterOptions(sidoOptions);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프리랜서 기준 코드를 불러오지 못했습니다.'));
