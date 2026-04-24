@@ -29,6 +29,20 @@
     }).format(new Date(createdAt));
   }
 
+  const NOTIFICATION_TEXT_MAP: Array<[RegExp, string]> = [
+    [/\bIN_PROGRESS\b/gi, '진행 중'],
+    [/\bACCEPTED\b/gi, '수락됨'],
+    [/\bREQUESTED\b/gi, '요청됨'],
+    [/\bCOMPLETED\b/gi, '완료됨'],
+    [/\bCANCELLED\b/gi, '취소됨'],
+    [/\bREJECTED\b/gi, '거절됨'],
+    [/\bPENDING\b/gi, '대기 중'],
+  ];
+
+  function translateNotificationText(value: string): string {
+    return NOTIFICATION_TEXT_MAP.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
+  }
+
   function getNotificationLink(notification: NotificationSummaryResponse): string | null {
     switch (notification.notificationType) {
       case 'NOTICE':
@@ -244,10 +258,10 @@
                     onclick={() => handleNotificationSelect(notification)}
                   >
                     <div class="header-notification-top">
-                      <strong>{notification.title}</strong>
+                      <strong>{translateNotificationText(notification.title)}</strong>
                       <span>{formatNotificationTime(notification.createdAt)}</span>
                     </div>
-                    <p class="header-notification-message">{notification.content}</p>
+                    <p class="header-notification-message">{translateNotificationText(notification.content)}</p>
                     <span class="header-notification-meta">{getNotificationMeta(notification)}</span>
                   </button>
                 {/each}

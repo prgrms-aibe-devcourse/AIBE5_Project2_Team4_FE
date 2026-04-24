@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import './project.css';
 import AppHeader from '../components/AppHeader';
 import { getUser, type User } from '../store/appAuth';
@@ -147,6 +147,7 @@ function mergeProposalDetail(
 
 export default function ProjectPage3() {
   const [user, setUser] = useState<User | null>(null);
+  const [projectMode, setProjectMode] = useState<'user' | 'freelancer' | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
@@ -182,6 +183,7 @@ export default function ProjectPage3() {
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
   const [projectDetailLoading, setProjectDetailLoading] = useState(false);
   const [mutationLoading, setMutationLoading] = useState(false);
+  const autoOpenedOwnProjectRef = useRef(false);
 
   const filteredProjects = useMemo(
     () => statusFilter === 'ALL' ? projects : projects.filter((project) => project.status === statusFilter),
@@ -244,30 +246,41 @@ export default function ProjectPage3() {
         setProjectTypeMap(toOptionMap(projectTypes));
         setRegionMap(toOptionMap(regions));
 
-        if (user.role === 'ROLE_USER') {
-          const [projectPage, myReviewPage] = await Promise.all([
-            getMyProjects({ page: 0, size: 50 }),
-            getMyReviews({ page: 0, size: 100 }),
-          ]);
-
+        try {
+          const projectPage = await getMyProjects({ page: 0, size: 50 });
           setProjects(projectPage.content);
-          setMyReviews(
-            Object.fromEntries(
-              myReviewPage.content.map((review) => [review.projectId, review]),
-            ),
-          );
-        } else if (user.role === 'ROLE_FREELANCER') {
+          setProjectMode('user');
+
+          try {
+            const myReviewPage = await getMyReviews({ page: 0, size: 100 });
+            setMyReviews(
+              Object.fromEntries(
+                myReviewPage.content.map((review) => [review.projectId, review]),
+              ),
+            );
+          } catch {
+            setMyReviews({});
+          }
+        } catch {
           const [proposalPage, myReviewPage] = await Promise.all([
             getMyFreelancerProposals({ page: 0, size: 50 }),
             getMyReviews({ page: 0, size: 100 }),
           ]);
           setFreelancerProposals(proposalPage.content);
+          setProjectMode('freelancer');
           setMyReviews(
             Object.fromEntries(
               myReviewPage.content.map((review) => [review.projectId, review]),
             ),
           );
-
+          try {
+            const allProjectPage = await getAllProjects({ page: 0, size: ALL_PROJECTS_PAGE_SIZE });
+            setAllProjects(allProjectPage.content);
+            setAllProjectsPage(allProjectPage.page);
+            setAllProjectsTotalPages(allProjectPage.totalPages);
+          } catch {
+            setAllProjectsUnavailable(true);
+          }
         }
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프로젝트 데이터를 불러오지 못했습니다.'));
@@ -280,7 +293,7 @@ export default function ProjectPage3() {
   }, [user]);
 
   useEffect(() => {
-    if (!user || user.role !== 'ROLE_FREELANCER') {
+    if (!user || projectMode !== 'freelancer') {
       return;
     }
 
@@ -315,7 +328,7 @@ export default function ProjectPage3() {
     };
 
     void loadAllProjects();
-  }, [allProjectsFilter, allProjectsPage, user]);
+  }, [allProjectsFilter, allProjectsPage, projectMode, user]);
 
   async function refreshUserProjects() {
     const response = await getMyProjects({ page: 0, size: 50 });
@@ -340,7 +353,7 @@ export default function ProjectPage3() {
       const detail = await getProject(projectId);
       setSelectedProject(detail);
 
-      if (user?.role === 'ROLE_USER') {
+      if (projectMode === 'user') {
         const proposals = await getProjectProposals(projectId, { page: 0, size: 20 });
         setSelectedProjectProposals(proposals.content);
       } else {
@@ -351,10 +364,10 @@ export default function ProjectPage3() {
     } finally {
       setProjectDetailLoading(false);
     }
-  }, [user?.role]);
+  }, [projectMode]);
 
   useEffect(() => {
-    if (loading || user?.role !== 'ROLE_USER') {
+    if (loading || projectMode !== 'user') {
       return;
     }
 
@@ -368,7 +381,29 @@ export default function ProjectPage3() {
     }
 
     void openProjectDetail(projectId);
-  }, [loading, openProjectDetail, selectedProject?.projectId, user?.role]);
+  }, [loading, openProjectDetail, projectMode, selectedProject?.projectId]);
+
+  useEffect(() => {
+    if (loading || projectMode !== 'user') {
+      return;
+    }
+
+    if (autoOpenedOwnProjectRef.current) {
+      return;
+    }
+
+    if (selectedProject || projects.length === 0) {
+      return;
+    }
+
+    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'));
+    if (Number.isFinite(projectId) && projectId > 0) {
+      return;
+    }
+
+    autoOpenedOwnProjectRef.current = true;
+    void openProjectDetail(projects[0].projectId);
+  }, [loading, openProjectDetail, projectMode, projects, selectedProject]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -499,7 +534,7 @@ export default function ProjectPage3() {
     try {
       if (selectedReview) {
         await updateMyReview(selectedReview.reviewId, reviewForm);
-      } else if (user?.role === 'ROLE_FREELANCER' && reviewingProjectId != null) {
+      } else if (projectMode === 'freelancer' && reviewingProjectId != null) {
         await createRequesterReview(reviewingProjectId, reviewForm);
       } else if (selectedProject) {
         await createProjectReview(selectedProject.projectId, reviewForm);
@@ -575,8 +610,8 @@ export default function ProjectPage3() {
     return null;
   }
 
-  const isUser = user.role === 'ROLE_USER';
-  const isFreelancer = user.role === 'ROLE_FREELANCER';
+  const isUser = projectMode === 'user';
+  const isFreelancer = projectMode === 'freelancer';
 
   function handleAllProjectsFilterChange(nextFilter: FreelancerProjectFilter) {
     setAllProjectsFilter(nextFilter);
