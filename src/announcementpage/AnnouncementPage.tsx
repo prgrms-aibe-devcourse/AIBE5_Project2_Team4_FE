@@ -145,7 +145,7 @@ export default function AnnouncementPage() {
       }
     };
     void loadNotice();
-  }, [selectedNoticeId]);
+  }, [isAdmin, selectedNoticeId, user]);
 
   useEffect(() => {
     if (!selectedNotice || editingNoticeId !== selectedNotice.noticeId) return;

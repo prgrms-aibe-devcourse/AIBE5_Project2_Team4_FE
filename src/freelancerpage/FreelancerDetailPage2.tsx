@@ -11,6 +11,7 @@ import { createReviewReport, type ReportReasonType } from '../api/reports';
 import { getFreelancerReviews, type ReviewSummaryResponse } from '../api/reviews';
 import { getErrorMessage } from '../lib/errors';
 import { formatDateTime, labelOf } from '../lib/referenceData';
+import { openChatWithFreelancer } from '../store/chatStore';
 
 const REPORT_REASON_OPTIONS: Array<{ code: ReportReasonType; label: string }> = [
   { code: 'SPAM', label: '스팸' },
@@ -40,6 +41,7 @@ export default function FreelancerDetailPage2() {
   const [reportReasonType, setReportReasonType] = useState<ReportReasonType>('ETC');
   const [reportReasonDetail, setReportReasonDetail] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [chatStarting, setChatStarting] = useState(false);
   const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
   const [timeSlotMap, setTimeSlotMap] = useState<Map<string, string>>(new Map());
@@ -163,6 +165,23 @@ export default function FreelancerDetailPage2() {
     }
   }
 
+  async function handleStartChat() {
+    if (!freelancer) {
+      return;
+    }
+
+    setChatStarting(true);
+    setError('');
+
+    try {
+      await openChatWithFreelancer(freelancer.freelancerProfileId);
+    } catch (caughtError) {
+      setError(getErrorMessage(caughtError, '채팅을 시작하지 못했습니다.'));
+    } finally {
+      setChatStarting(false);
+    }
+  }
+
   async function handleReviewReport() {
     if (!reportingReviewId) {
       return;
@@ -256,6 +275,14 @@ export default function FreelancerDetailPage2() {
 
             {user?.role === 'ROLE_USER' && (
               <div className="fd-action-row">
+                <button
+                  type="button"
+                  className="fd-propose-btn"
+                  disabled={chatStarting}
+                  onClick={() => void handleStartChat()}
+                >
+                  채팅하기
+                </button>
                 <button type="button" className="fd-propose-btn" onClick={() => setProposing(true)}>프로젝트 제안하기</button>
               </div>
             )}

@@ -31,6 +31,11 @@ interface Props {
   onFieldChange: (field: keyof ProjectFormValues, value: string) => void;
 }
 
+function getNowMin(): string {
+  const now = new Date();
+  return new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+}
+
 export default function ProjectFormModal({
   mode,
   form,
@@ -42,7 +47,7 @@ export default function ProjectFormModal({
   onFieldChange,
 }: Props) {
   const isEdit = mode === 'edit';
-  const nowMin = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  const [nowMin] = useState(getNowMin);
 
   const sidoOnly = regionOptions.filter((r) => r.regionLevel === 1);
   const topRegions = sortSido(sidoOnly.length > 0 ? sidoOnly : regionOptions.filter((r) => !r.parentRegionCode));

@@ -1,128 +1,107 @@
+import {
+  createChatConversation,
+  getChatConversations,
+  getChatMessages,
+  markChatConversationRead,
+  sendChatMessageRequest,
+  type ChatConversationSummaryResponse,
+  type ChatMessageResponse,
+} from '../api/chats';
+
 export interface ChatMessage {
   id: string;
   conversationId: string;
-  senderEmail: string;
+  messageId: number;
+  senderUserId: number;
+  senderName: string;
+  senderRoleCode: string;
   text: string;
   sentAt: string;
+  read: boolean;
+  readAt?: string | null;
 }
 
 export interface Conversation {
   id: string;
-  userEmail: string;
-  userName: string;
-  freelancerId: number;
-  freelancerName: string;
-  freelancerEmail: string;
+  conversationId: number;
+  otherUserId: number;
+  otherName: string;
+  otherEmail: string;
+  otherRoleCode: string;
+  lastMessage?: string | null;
+  lastMessageAt?: string | null;
+  unreadCount: number;
 }
 
 export const CHAT_EVENT = 'stella:chat-message';
 export const CHAT_OPEN_EVENT = 'stella:open-chat';
 
-const STORAGE_MESSAGES = 'stella_chat_messages';
-const STORAGE_CONVS = 'stella_chat_conversations';
-const STORAGE_READ = 'stella_chat_read';
-
-export function makeConvId(userEmail: string, freelancerId: number): string {
-  return `conv-${encodeURIComponent(userEmail)}-${freelancerId}`;
-}
-
-function loadMessages(): Record<string, ChatMessage[]> {
-  try {
-    const raw = localStorage.getItem(STORAGE_MESSAGES);
-    return raw ? (JSON.parse(raw) as Record<string, ChatMessage[]>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveMessages(data: Record<string, ChatMessage[]>): void {
-  localStorage.setItem(STORAGE_MESSAGES, JSON.stringify(data));
-}
-
-function loadConversations(): Conversation[] {
-  try {
-    const raw = localStorage.getItem(STORAGE_CONVS);
-    return raw ? (JSON.parse(raw) as Conversation[]) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveConversations(convs: Conversation[]): void {
-  localStorage.setItem(STORAGE_CONVS, JSON.stringify(convs));
-}
-
-function loadReadTimestamps(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(STORAGE_READ);
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {};
-  } catch {
-    return {};
-  }
-}
-
-function saveReadTimestamps(data: Record<string, string>): void {
-  localStorage.setItem(STORAGE_READ, JSON.stringify(data));
-}
-
-export function registerConversation(conv: Conversation): void {
-  const convs = loadConversations();
-  if (!convs.find((c) => c.id === conv.id)) {
-    convs.push(conv);
-    saveConversations(convs);
-  }
-}
-
-export function getMessages(conversationId: string): ChatMessage[] {
-  const data = loadMessages();
-  return data[conversationId] ?? [];
-}
-
-export function sendChatMessage(
-  conversationId: string,
-  senderEmail: string,
-  text: string,
-): ChatMessage {
-  const msg: ChatMessage = {
-    id: `msg-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    conversationId,
-    senderEmail,
-    text,
-    sentAt: new Date().toISOString(),
+function toConversation(response: ChatConversationSummaryResponse): Conversation {
+  return {
+    id: String(response.conversationId),
+    conversationId: response.conversationId,
+    otherUserId: response.otherUserId,
+    otherName: response.otherUserName,
+    otherEmail: response.otherUserEmail,
+    otherRoleCode: response.otherUserRoleCode,
+    lastMessage: response.lastMessage,
+    lastMessageAt: response.lastMessageAt,
+    unreadCount: response.unreadCount,
   };
-
-  const data = loadMessages();
-  if (!data[conversationId]) {
-    data[conversationId] = [];
-  }
-  data[conversationId].push(msg);
-  saveMessages(data);
-
-  window.dispatchEvent(new CustomEvent(CHAT_EVENT, { detail: msg }));
-  return msg;
 }
 
-export function markAsRead(conversationId: string, userEmail: string): void {
-  const key = `${conversationId}::${userEmail}`;
-  const data = loadReadTimestamps();
-  data[key] = new Date().toISOString();
-  saveReadTimestamps(data);
+function toMessage(response: ChatMessageResponse): ChatMessage {
+  return {
+    id: String(response.messageId),
+    conversationId: String(response.conversationId),
+    messageId: response.messageId,
+    senderUserId: response.senderUserId,
+    senderName: response.senderName,
+    senderRoleCode: response.senderRoleCode,
+    text: response.content,
+    sentAt: response.createdAt,
+    read: response.readYn,
+    readAt: response.readAt,
+  };
 }
 
-export function getUnreadCount(conversationId: string, userEmail: string): number {
-  const key = `${conversationId}::${userEmail}`;
-  const data = loadReadTimestamps();
-  const lastRead = data[key];
-  const messages = getMessages(conversationId);
-
-  if (!lastRead) {
-    return messages.filter((m) => m.senderEmail !== userEmail).length;
-  }
-  return messages.filter((m) => m.senderEmail !== userEmail && m.sentAt > lastRead).length;
+function dispatchChatMessage(message: ChatMessage): void {
+  window.dispatchEvent(new CustomEvent(CHAT_EVENT, { detail: message }));
 }
 
-export function getConversationsFor(email: string, _role: string): Conversation[] {
-  return loadConversations().filter(
-    (c) => c.userEmail === email || c.freelancerEmail === email,
-  );
+function dispatchOpenConversation(conversation: Conversation): void {
+  window.dispatchEvent(new CustomEvent(CHAT_OPEN_EVENT, { detail: conversation }));
+}
+
+export async function getConversationsFor(): Promise<Conversation[]> {
+  const conversations = await getChatConversations();
+  return conversations.map(toConversation);
+}
+
+export async function getMessages(conversationId: string | number): Promise<ChatMessage[]> {
+  const response = await getChatMessages(Number(conversationId), { page: 0, size: 100 });
+  return response.content.map(toMessage).reverse();
+}
+
+export async function sendChatMessage(
+  conversationId: string | number,
+  text: string,
+): Promise<ChatMessage> {
+  const message = toMessage(await sendChatMessageRequest(Number(conversationId), text));
+  dispatchChatMessage(message);
+  return message;
+}
+
+export async function markAsRead(conversationId: string | number): Promise<void> {
+  await markChatConversationRead(Number(conversationId));
+}
+
+export function getUnreadCount(conversation: Conversation): number {
+  return conversation.unreadCount;
+}
+
+export async function openChatWithFreelancer(freelancerProfileId: number): Promise<Conversation> {
+  const conversation = toConversation(await createChatConversation({ targetFreelancerProfileId: freelancerProfileId }));
+  dispatchOpenConversation(conversation);
+  return conversation;
 }

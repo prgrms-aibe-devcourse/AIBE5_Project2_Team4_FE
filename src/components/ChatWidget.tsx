@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import './ChatWidget.css';
 import { AUTH_USER_EVENT, getUser, type User } from '../store/appAuth';
 import {
@@ -13,13 +13,15 @@ import {
   type Conversation,
 } from '../store/chatStore';
 
-function formatTime(iso: string): string {
+function formatTime(iso: string | null | undefined): string {
+  if (!iso) return '';
   const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
   return new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
-function totalUnread(convs: Conversation[], email: string): number {
-  return convs.reduce((sum, c) => sum + getUnreadCount(c.id, email), 0);
+function initialOf(name: string | null | undefined): string {
+  return name?.trim()[0] ?? '?';
 }
 
 function SendIcon() {
@@ -88,7 +90,7 @@ function ConvListView({ user, convs, onSelect, onClose }: ConvListViewProps) {
     <>
       <div className="chat-widget-header">
         <div className="chat-widget-header-left">
-          <div className="chat-widget-avatar">{user.name[0]}</div>
+          <div className="chat-widget-avatar">{initialOf(user.name)}</div>
           <div>
             <div className="chat-widget-title">채팅</div>
             <div className="chat-widget-subtitle">{user.name}</div>
@@ -107,11 +109,7 @@ function ConvListView({ user, convs, onSelect, onClose }: ConvListViewProps) {
           </div>
         ) : (
           convs.map((conv) => {
-            const msgs = getMessages(conv.id);
-            const lastMsg = msgs[msgs.length - 1];
-            const unread = getUnreadCount(conv.id, user.email);
-            const otherName =
-              conv.userEmail === user.email ? conv.freelancerName : conv.userName;
+            const unread = getUnreadCount(conv);
 
             return (
               <button
@@ -120,16 +118,16 @@ function ConvListView({ user, convs, onSelect, onClose }: ConvListViewProps) {
                 className="chat-conv-item"
                 onClick={() => onSelect(conv)}
               >
-                <div className="chat-conv-avatar">{otherName[0]}</div>
+                <div className="chat-conv-avatar">{initialOf(conv.otherName)}</div>
                 <div className="chat-conv-body">
                   <div className="chat-conv-row">
-                    <span className="chat-conv-name">{otherName}</span>
-                    {lastMsg && (
-                      <span className="chat-conv-time">{formatTime(lastMsg.sentAt)}</span>
+                    <span className="chat-conv-name">{conv.otherName}</span>
+                    {conv.lastMessageAt && (
+                      <span className="chat-conv-time">{formatTime(conv.lastMessageAt)}</span>
                     )}
                   </div>
                   <div className="chat-conv-row">
-                    <span className="chat-conv-last">{lastMsg?.text ?? '메시지가 없습니다'}</span>
+                    <span className="chat-conv-last">{conv.lastMessage ?? '메시지가 없습니다'}</span>
                     {unread > 0 && (
                       <span className="chat-conv-badge">{unread > 9 ? '9+' : unread}</span>
                     )}
@@ -150,21 +148,20 @@ interface MessageViewProps {
   messages: ChatMessage[];
   onBack: () => void;
   onClose: () => void;
-  onSend: (text: string) => void;
+  onSend: (text: string) => void | Promise<void>;
 }
 
 function MessageView({ user, conv, messages, onBack, onClose, onSend }: MessageViewProps) {
   const [draft, setDraft] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const otherName =
-    conv.userEmail === user.email ? conv.freelancerName : conv.userName;
+  const otherName = conv.otherName;
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+  function handleKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
       submit();
@@ -175,7 +172,7 @@ function MessageView({ user, conv, messages, onBack, onClose, onSend }: MessageV
     const text = draft.trim();
     if (!text) return;
     setDraft('');
-    onSend(text);
+    void onSend(text);
     setTimeout(() => textareaRef.current?.focus(), 0);
   }
 
@@ -187,7 +184,7 @@ function MessageView({ user, conv, messages, onBack, onClose, onSend }: MessageV
             <BackIcon />
           </button>
           <div className="chat-widget-header-info">
-            <div className="chat-widget-avatar">{otherName[0]}</div>
+            <div className="chat-widget-avatar">{initialOf(otherName)}</div>
             <div>
               <div className="chat-widget-title">{otherName}</div>
             </div>
@@ -202,10 +199,10 @@ function MessageView({ user, conv, messages, onBack, onClose, onSend }: MessageV
           <p className="chat-start-hint">대화를 시작해보세요</p>
         )}
         {messages.map((msg) => {
-          const isUser = msg.senderEmail === user.email;
+          const isUser = msg.senderUserId === user.userId;
           return (
             <div key={msg.id} className={`chat-message${isUser ? ' chat-message--user' : ' chat-message--bot'}`}>
-              {!isUser && <div className="chat-bot-avatar">{otherName[0]}</div>}
+              {!isUser && <div className="chat-bot-avatar">{initialOf(otherName)}</div>}
               <div className="chat-bubble-wrap">
                 <div className="chat-bubble">{msg.text}</div>
                 <span className="chat-timestamp">{formatTime(msg.sentAt)}</span>
@@ -247,27 +244,37 @@ export default function ChatWidget() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const refreshConvs = useCallback((u: User | null) => {
-    if (!u) {
+  const refreshConvs = useCallback(async (currentUser: User | null) => {
+    if (!currentUser) {
       setConvs([]);
       return;
     }
-    setConvs(getConversationsFor(u.email, u.role));
+
+    try {
+      setConvs(await getConversationsFor());
+    } catch {
+      setConvs([]);
+    }
   }, []);
 
-  const refreshMessages = useCallback((conv: Conversation | null) => {
+  const refreshMessages = useCallback(async (conv: Conversation | null) => {
     if (!conv) {
       setMessages([]);
       return;
     }
-    setMessages(getMessages(conv.id));
+
+    try {
+      setMessages(await getMessages(conv.id));
+    } catch {
+      setMessages([]);
+    }
   }, []);
 
   useEffect(() => {
     const syncUser = () => {
-      const u = getUser();
-      setUser(u);
-      refreshConvs(u);
+      const nextUser = getUser();
+      setUser(nextUser);
+      void refreshConvs(nextUser);
     };
     syncUser();
     window.addEventListener(AUTH_USER_EVENT, syncUser as EventListener);
@@ -276,28 +283,31 @@ export default function ChatWidget() {
 
   useEffect(() => {
     const handleNewMessage = (e: Event) => {
-      const msg = (e as CustomEvent<import('../store/chatStore').ChatMessage>).detail;
-      refreshConvs(getUser());
+      const msg = (e as CustomEvent<ChatMessage>).detail;
+      void refreshConvs(getUser());
       if (activeConv && msg.conversationId === activeConv.id) {
-        setMessages(getMessages(activeConv.id));
+        void refreshMessages(activeConv);
       }
     };
     window.addEventListener(CHAT_EVENT, handleNewMessage);
     return () => window.removeEventListener(CHAT_EVENT, handleNewMessage);
-  }, [activeConv, refreshConvs]);
+  }, [activeConv, refreshConvs, refreshMessages]);
 
   useEffect(() => {
     const handleOpenChat = (e: Event) => {
       const conv = (e as CustomEvent<Conversation>).detail;
-      refreshConvs(getUser());
+      const currentUser = getUser();
       setActiveConv(conv);
-      setMessages(getMessages(conv.id));
-      if (user) markAsRead(conv.id, user.email);
       setOpen(true);
+      void (async () => {
+        await markAsRead(conv.id);
+        await refreshMessages(conv);
+        await refreshConvs(currentUser);
+      })();
     };
     window.addEventListener(CHAT_OPEN_EVENT, handleOpenChat as EventListener);
     return () => window.removeEventListener(CHAT_OPEN_EVENT, handleOpenChat as EventListener);
-  }, [user, refreshConvs]);
+  }, [refreshConvs, refreshMessages]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -309,10 +319,23 @@ export default function ChatWidget() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [open]);
 
+  useEffect(() => {
+    if (!user) return undefined;
+
+    const intervalId = window.setInterval(() => {
+      void refreshConvs(getUser());
+      if (activeConv) {
+        void refreshMessages(activeConv);
+      }
+    }, 5000);
+
+    return () => window.clearInterval(intervalId);
+  }, [activeConv, refreshConvs, refreshMessages, user]);
+
   if (!user) return null;
 
   const totalUnreadCount = convs.reduce(
-    (sum, c) => sum + getUnreadCount(c.id, user.email),
+    (sum, c) => sum + getUnreadCount(c),
     0,
   );
 
@@ -320,21 +343,26 @@ export default function ChatWidget() {
     const next = !open;
     setOpen(next);
     if (next) {
-      refreshConvs(user);
       setActiveConv(null);
+      setMessages([]);
+      void refreshConvs(user);
     }
   }
 
   function handleSelectConv(conv: Conversation) {
     setActiveConv(conv);
-    setMessages(getMessages(conv.id));
-    markAsRead(conv.id, user!.email);
-    refreshConvs(user);
+    setMessages([]);
+    void (async () => {
+      await markAsRead(conv.id);
+      await refreshMessages(conv);
+      await refreshConvs(user);
+    })();
   }
 
   function handleBack() {
     setActiveConv(null);
-    refreshConvs(user);
+    setMessages([]);
+    void refreshConvs(user);
   }
 
   function handleClose() {
@@ -342,11 +370,21 @@ export default function ChatWidget() {
     setActiveConv(null);
   }
 
-  function handleSend(text: string) {
+  async function handleSend(text: string) {
     if (!activeConv || !user) return;
-    sendChatMessage(activeConv.id, user.email, text);
-    setMessages(getMessages(activeConv.id));
-    refreshConvs(user);
+    const conv = activeConv;
+
+    try {
+      const message = await sendChatMessage(conv.id, text);
+      setMessages((currentMessages) => (
+        currentMessages.some((currentMessage) => currentMessage.id === message.id)
+          ? currentMessages
+          : [...currentMessages, message]
+      ));
+      await refreshConvs(user);
+    } catch {
+      await refreshMessages(conv);
+    }
   }
 
   return (
