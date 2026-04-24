@@ -96,11 +96,13 @@ export function createProposal(projectId: number, request: ProposalCreateRequest
 
 export function getMyFreelancerProposals(params: {
   status?: ProposalStatus;
+  projectStatus?: ProjectStatus;
   page?: number;
   size?: number;
 } = {}): Promise<FreelancerProposalListResponse> {
   const search = new URLSearchParams();
   if (params.status) search.set('status', params.status);
+  if (params.projectStatus) search.set('projectStatus', params.projectStatus);
   if (params.page != null) search.set('page', String(params.page));
   if (params.size != null) search.set('size', String(params.size));
   const query = search.toString();

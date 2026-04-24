@@ -45,8 +45,17 @@ import ProposalTab from './ProposalTab';
 import ReviewModal from './ReviewModal';
 
 type StatusFilter = 'ALL' | ProjectStatus;
+type FreelancerProjectFilter = 'ALL' | 'REQUESTED' | 'PROPOSED' | 'ACCEPTED' | 'COMPLETED';
 
 const PROJECT_STATUSES: ProjectStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const FREELANCER_PROJECT_FILTERS: Array<{ value: FreelancerProjectFilter; label: string }> = [
+  { value: 'ALL', label: '전체' },
+  { value: 'REQUESTED', label: '요청' },
+  { value: 'PROPOSED', label: '제안' },
+  { value: 'ACCEPTED', label: '수락' },
+  { value: 'COMPLETED', label: '완료' },
+];
+const PROJECT_LIST_FILTERS = new Set<FreelancerProjectFilter>(['ALL', 'REQUESTED']);
 const ALL_PROJECTS_PAGE_SIZE = 9;
 const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   REQUESTED: '요청',
@@ -145,7 +154,7 @@ export default function ProjectPage3() {
   const [allProjects, setAllProjects] = useState<ProjectSummaryResponse[]>([]);
   const [allProjectsPage, setAllProjectsPage] = useState(0);
   const [allProjectsTotalPages, setAllProjectsTotalPages] = useState(0);
-  const [allProjectsFilter, setAllProjectsFilter] = useState<StatusFilter>('ALL');
+  const [allProjectsFilter, setAllProjectsFilter] = useState<FreelancerProjectFilter>('ALL');
   const [allProjectsUnavailable, setAllProjectsUnavailable] = useState(false);
   const [allProjectsLoading, setAllProjectsLoading] = useState(false);
   const [freelancerProposals, setFreelancerProposals] = useState<ProposalSummaryResponse[]>([]);
@@ -179,10 +188,25 @@ export default function ProjectPage3() {
     [projects, statusFilter],
   );
 
-  const acceptedFreelancerProjects = useMemo(
-    () => freelancerProposals.filter((proposal) => proposal.proposalStatus === 'ACCEPTED'),
-    [freelancerProposals],
-  );
+  const visibleFreelancerProposals = useMemo(() => {
+    if (allProjectsFilter === 'PROPOSED') {
+      return freelancerProposals.filter((proposal) => proposal.proposalStatus === 'PENDING');
+    }
+
+    if (allProjectsFilter === 'ACCEPTED') {
+      return freelancerProposals.filter((proposal) => (
+        proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus !== 'COMPLETED'
+      ));
+    }
+
+    if (allProjectsFilter === 'COMPLETED') {
+      return freelancerProposals.filter((proposal) => (
+        proposal.proposalStatus === 'ACCEPTED' && proposal.projectStatus === 'COMPLETED'
+      ));
+    }
+
+    return [];
+  }, [allProjectsFilter, freelancerProposals]);
 
   useEffect(() => {
     const nextUser = getUser();
@@ -260,6 +284,12 @@ export default function ProjectPage3() {
       return;
     }
 
+    if (!PROJECT_LIST_FILTERS.has(allProjectsFilter)) {
+      setAllProjectsLoading(false);
+      setAllProjectsUnavailable(false);
+      return;
+    }
+
     const loadAllProjects = async () => {
       setAllProjectsLoading(true);
       setAllProjectsUnavailable(false);
@@ -268,7 +298,7 @@ export default function ProjectPage3() {
         const response = await getAllProjects({
           page: allProjectsPage,
           size: ALL_PROJECTS_PAGE_SIZE,
-          status: allProjectsFilter === 'ALL' ? undefined : allProjectsFilter,
+          status: allProjectsFilter === 'REQUESTED' ? 'REQUESTED' : undefined,
         });
         setAllProjects(response.content);
         setAllProjectsTotalPages(response.totalPages);
@@ -548,11 +578,7 @@ export default function ProjectPage3() {
   const isUser = user.role === 'ROLE_USER';
   const isFreelancer = user.role === 'ROLE_FREELANCER';
 
-  function scrollToSection(sectionId: string) {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-
-  function handleAllProjectsFilterChange(nextFilter: StatusFilter) {
+  function handleAllProjectsFilterChange(nextFilter: FreelancerProjectFilter) {
     setAllProjectsFilter(nextFilter);
     setAllProjectsPage(0);
   }
@@ -637,162 +663,99 @@ export default function ProjectPage3() {
           </>
         ) : isFreelancer ? (
           <>
-            <nav className="project-nav" aria-label="프리랜서 프로젝트 내비게이션">
-              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-all-projects')}>
-                전체 프로젝트
-              </button>
-              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-active-projects')}>
-                참여 프로젝트
-              </button>
-              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-proposals')}>
-                받은 제안
-              </button>
-            </nav>
-
-            <section className="project-section" id="freelancer-all-projects">
-              <div className="project-header">
-                <div>
-                  <h2 className="project-title" style={{ fontSize: '1.35rem' }}>전체 프로젝트</h2>
-                  <p className="project-subtitle">모든 프로젝트를 열람할 수 있습니다.</p>
-                </div>
-              </div>
-
+            <section className="project-section" id="freelancer-projects">
               <div className="filter-bar">
-                {(['ALL', ...PROJECT_STATUSES] as StatusFilter[]).map((filter) => (
+                {FREELANCER_PROJECT_FILTERS.map((filter) => (
                   <button
-                    key={filter}
+                    key={filter.value}
                     type="button"
-                    className={`filter-chip${allProjectsFilter === filter ? ' active' : ''}`}
-                    onClick={() => handleAllProjectsFilterChange(filter)}
+                    className={`filter-chip${allProjectsFilter === filter.value ? ' active' : ''}`}
+                    onClick={() => handleAllProjectsFilterChange(filter.value)}
                   >
-                    {filter === 'ALL' ? '전체' : PROJECT_STATUS_LABEL[filter]}
+                    {filter.label}
                   </button>
                 ))}
               </div>
 
-              {allProjectsUnavailable ? (
-                <div className="project-empty"><p>전체 프로젝트 목록을 불러올 수 없습니다.</p></div>
-              ) : allProjectsLoading ? (
-                <div className="project-empty"><p>전체 프로젝트를 불러오는 중입니다.</p></div>
-              ) : allProjects.length === 0 ? (
-                <div className="project-empty"><p>조건에 맞는 프로젝트가 없습니다.</p></div>
-              ) : (
-                <>
-                  <ul className="project-list">
-                    {allProjects.map((project) => (
-                    <li
-                      key={project.projectId}
-                      className="project-card"
-                      onClick={() => void openProjectDetail(project.projectId)}
-                    >
-                      <div className="project-card-top">
-                        <span className="project-type-badge">{labelOf(projectTypeMap, project.projectTypeCode)}</span>
-                        <span className={`project-status ${STATUS_COLOR[project.status]}`}>
-                          {PROJECT_STATUS_LABEL[project.status]}
-                        </span>
-                      </div>
-                      <h3 className="project-card-title">{project.title}</h3>
-                      <div className="project-card-meta">
-                        <span>일정 {formatDateTime(project.requestedStartAt)}</span>
-                        <span>지역 {labelOf(regionMap, project.serviceRegionCode)}</span>
-                      </div>
-                    </li>
-                    ))}
-                  </ul>
-
-                  {allProjectsTotalPages > 1 && (
-                    <div className="project-pagination" aria-label="전체 프로젝트 페이지 이동">
-                      <button
-                        type="button"
-                        className="project-page-btn"
-                        disabled={allProjectsPage === 0 || allProjectsLoading}
-                        onClick={() => handleAllProjectsPageChange(allProjectsPage - 1)}
+              {PROJECT_LIST_FILTERS.has(allProjectsFilter) ? (
+                allProjectsUnavailable ? (
+                  <div className="project-empty"><p>전체 프로젝트 목록을 불러올 수 없습니다.</p></div>
+                ) : allProjectsLoading ? (
+                  <div className="project-empty"><p>전체 프로젝트를 불러오는 중입니다.</p></div>
+                ) : allProjects.length === 0 ? (
+                  <div className="project-empty"><p>조건에 맞는 프로젝트가 없습니다.</p></div>
+                ) : (
+                  <>
+                    <ul className="project-list">
+                      {allProjects.map((project) => (
+                      <li
+                        key={project.projectId}
+                        className="project-card"
+                        onClick={() => void openProjectDetail(project.projectId)}
                       >
-                        이전
-                      </button>
-
-                      {Array.from({ length: allProjectsTotalPages }, (_, pageIndex) => pageIndex).map((pageIndex) => (
-                        <button
-                          key={pageIndex}
-                          type="button"
-                          className={`project-page-btn${allProjectsPage === pageIndex ? ' active' : ''}`}
-                          disabled={allProjectsLoading}
-                          onClick={() => handleAllProjectsPageChange(pageIndex)}
-                        >
-                          {pageIndex + 1}
-                        </button>
-                      ))}
-
-                      <button
-                        type="button"
-                        className="project-page-btn"
-                        disabled={allProjectsPage >= allProjectsTotalPages - 1 || allProjectsLoading}
-                        onClick={() => handleAllProjectsPageChange(allProjectsPage + 1)}
-                      >
-                        다음
-                      </button>
-                    </div>
-                  )}
-                </>
-              )}
-            </section>
-
-            <section className="project-section" id="freelancer-active-projects">
-              <div className="project-header">
-                <div>
-                  <h2 className="project-title" style={{ fontSize: '1.35rem' }}>참여 프로젝트</h2>
-                  <p className="project-subtitle">수락된 프로젝트를 먼저 확인할 수 있습니다.</p>
-                </div>
-              </div>
-
-              {acceptedFreelancerProjects.length === 0 ? (
-                <div className="project-empty"><p>수락된 프로젝트가 없습니다.</p></div>
-              ) : (
-                <ul className="proposal-list">
-                  {acceptedFreelancerProjects.map((proposal) => (
-                    <li key={proposal.proposalId} className="proposal-card">
-                      <div className="proposal-card-top">
-                        <div className="proposal-card-meta">
-                          <span className="project-type-badge">참여중</span>
-                          <span className={`project-status ${STATUS_COLOR[proposal.projectStatus]}`}>
-                            {PROJECT_STATUS_LABEL[proposal.projectStatus]}
+                        <div className="project-card-top">
+                          <span className="project-type-badge">{labelOf(projectTypeMap, project.projectTypeCode)}</span>
+                          <span className={`project-status ${STATUS_COLOR[project.status]}`}>
+                            {PROJECT_STATUS_LABEL[project.status]}
                           </span>
                         </div>
-                        <span className="proposal-card-date">{formatDateTime(proposal.createdAt)}</span>
-                      </div>
-                      <h3 className="proposal-card-title">{proposal.projectTitle}</h3>
-                      <div className="proposal-card-info">
-                        <span>프로젝트 상태: {PROJECT_STATUS_LABEL[proposal.projectStatus]}</span>
-                        <span>제안 상태: {PROPOSAL_STATUS_LABEL[proposal.proposalStatus]}</span>
-                      </div>
-                      <div className="proposal-card-actions">
+                        <h3 className="project-card-title">{project.title}</h3>
+                        <div className="project-card-meta">
+                          <span>일정 {formatDateTime(project.requestedStartAt)}</span>
+                          <span>지역 {labelOf(regionMap, project.serviceRegionCode)}</span>
+                        </div>
+                      </li>
+                      ))}
+                    </ul>
+
+                    {allProjectsTotalPages > 1 && (
+                      <div className="project-pagination" aria-label="전체 프로젝트 페이지 이동">
                         <button
                           type="button"
-                          className="proposal-btn proposal-btn--review"
-                          disabled={freelancerProjectLoading}
-                          onClick={() => void openFreelancerProjectDetail(proposal.proposalId)}
+                          className="project-page-btn"
+                          disabled={allProjectsPage === 0 || allProjectsLoading}
+                          onClick={() => handleAllProjectsPageChange(allProjectsPage - 1)}
                         >
-                          프로젝트 열람
+                          이전
+                        </button>
+
+                        {Array.from({ length: allProjectsTotalPages }, (_, pageIndex) => pageIndex).map((pageIndex) => (
+                          <button
+                            key={pageIndex}
+                            type="button"
+                            className={`project-page-btn${allProjectsPage === pageIndex ? ' active' : ''}`}
+                            disabled={allProjectsLoading}
+                            onClick={() => handleAllProjectsPageChange(pageIndex)}
+                          >
+                            {pageIndex + 1}
+                          </button>
+                        ))}
+
+                        <button
+                          type="button"
+                          className="project-page-btn"
+                          disabled={allProjectsPage >= allProjectsTotalPages - 1 || allProjectsLoading}
+                          onClick={() => handleAllProjectsPageChange(allProjectsPage + 1)}
+                        >
+                          다음
                         </button>
                       </div>
-                    </li>
-                  ))}
-                </ul>
+                    )}
+                  </>
+                )
+              ) : (
+                <ProposalTab
+                  proposals={visibleFreelancerProposals}
+                  loading={mutationLoading}
+                  reviewedProjectIds={new Set(Object.keys(myReviews).map(Number))}
+                  onAccept={(proposalId) => void handleProposalAccept(proposalId)}
+                  onReject={(proposalId) => void handleProposalReject(proposalId)}
+                  onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}
+                  onCompleteProject={(proposalId) => void transitionProposalProject(proposalId, 'complete')}
+                  onWriteReview={(projectId, projectTitle) => openFreelancerReviewModal(projectId, projectTitle)}
+                  onViewProject={(proposalId) => void openFreelancerProjectDetail(proposalId)}
+                />
               )}
-            </section>
-
-            <section className="project-section" id="freelancer-proposals">
-            <ProposalTab
-              proposals={freelancerProposals}
-              loading={mutationLoading}
-              reviewedProjectIds={new Set(Object.keys(myReviews).map(Number))}
-              onAccept={(proposalId) => void handleProposalAccept(proposalId)}
-              onReject={(proposalId) => void handleProposalReject(proposalId)}
-              onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}
-              onCompleteProject={(proposalId) => void transitionProposalProject(proposalId, 'complete')}
-              onWriteReview={(projectId, projectTitle) => openFreelancerReviewModal(projectId, projectTitle)}
-              onViewProject={(proposalId) => void openFreelancerProjectDetail(proposalId)}
-            />
             </section>
           </>
         ) : (
