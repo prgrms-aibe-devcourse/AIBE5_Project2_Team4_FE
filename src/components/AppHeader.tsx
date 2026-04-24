@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import './appHeader.css';
 import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
-import { canSendAnnouncement } from '../store/accessControl';
+import ChatWidget from './ChatWidget';
+import { canSendAnnouncement, effectiveNoticeRole } from '../store/accessControl';
 import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
 import {
   deleteNotification,
@@ -39,6 +40,20 @@ function formatNotificationTime(createdAt: string): string {
   }).format(new Date(createdAt));
 }
 
+const NOTIFICATION_TEXT_MAP: Array<[RegExp, string]> = [
+  [/\bIN_PROGRESS\b/gi, '진행 중'],
+  [/\bACCEPTED\b/gi, '수락됨'],
+  [/\bREQUESTED\b/gi, '요청됨'],
+  [/\bCOMPLETED\b/gi, '완료됨'],
+  [/\bCANCELLED\b/gi, '취소됨'],
+  [/\bREJECTED\b/gi, '거절됨'],
+  [/\bPENDING\b/gi, '대기 중'],
+];
+
+function translateNotificationText(value: string): string {
+  return NOTIFICATION_TEXT_MAP.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
+}
+
 function getNotificationLink(notification: NotificationSummaryResponse): string | null {
   switch (notification.notificationType) {
     case 'NOTICE':
@@ -59,6 +74,17 @@ function getNotificationLink(notification: NotificationSummaryResponse): string 
       return null;
   }
 }
+
+function isNoticeVisibleToRole(notification: NotificationSummaryResponse, userRole: string | undefined): boolean {
+  if (notification.notificationType !== 'NOTICE') return true;
+  const text = `${notification.title} ${notification.content}`;
+  const hasFR = text.includes('[FR]');
+  const hasUSR = text.includes('[USR]');
+  if (!hasFR && !hasUSR) return true;
+  if (hasFR) return userRole === 'ROLE_FREELANCER';
+  return userRole === 'ROLE_USER';
+}
+
 
 function getNotificationMeta(notification: NotificationSummaryResponse): string {
   if (!notification.isRead) {
@@ -87,8 +113,9 @@ export default function AppHeader({ activePage }: HeaderProps) {
 
     try {
       const response = await getNotifications({ page: 0, size: 20 });
-      setNotifications(response.content);
-      setUnreadCount(response.unreadCount);
+      const visible = response.content.filter((n) => isNoticeVisibleToRole(n, effectiveNoticeRole(nextUser)));
+      setNotifications(visible);
+      setUnreadCount(visible.filter((n) => !n.isRead).length);
     } catch {
       setNotifications([]);
       setUnreadCount(0);
@@ -182,6 +209,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
   }
 
   return (
+    <>
     <nav className="header">
       <div className="header-container">
         <a href="/" className="header-logo-wrap">
@@ -248,10 +276,10 @@ export default function AppHeader({ activePage }: HeaderProps) {
                           onClick={() => void handleNotificationSelect(notification)}
                         >
                           <div className="header-notification-top">
-                            <strong>{notification.title}</strong>
+                            <strong>{translateNotificationText(notification.title)}</strong>
                             <span>{formatNotificationTime(notification.createdAt)}</span>
                           </div>
-                          <p className="header-notification-message">{notification.content}</p>
+                          <p className="header-notification-message">{translateNotificationText(notification.content)}</p>
                           <span className="header-notification-meta">{getNotificationMeta(notification)}</span>
                         </button>
                         <button
@@ -309,5 +337,7 @@ export default function AppHeader({ activePage }: HeaderProps) {
         )}
       </div>
     </nav>
+    <ChatWidget />
+    </>
   );
 }

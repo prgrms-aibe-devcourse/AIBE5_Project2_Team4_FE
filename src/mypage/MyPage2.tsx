@@ -70,10 +70,12 @@ import {
 import { getMyPage, updateMyProfile, type UserMyPageResponse } from '../api/users';
 import { getErrorMessage } from '../lib/errors';
 import { formatDateTime, labelOf } from '../lib/referenceData';
+import { projectStatusLabel, roleLabel, verificationStatusLabel } from '../lib/koreanLabels';
 import VerifyTab from './tabs/VerifyTab';
 import ReviewsTab from './tabs/ReviewsTab';
 import ReportsTab from './tabs/ReportsTab';
 import UsageReportTab from './tabs/UsageReportTab';
+import { STATUS_LABEL, VERIFICATION_TYPE_LABEL } from './tabs/verifyTabShared';
 import type { VerifyStatus } from './tabs/verifyTabShared';
 import AccountTabContent from './components/AccountTabContent';
 import {
@@ -999,7 +1001,7 @@ export default function MyPage2() {
             <h1 className="username">{user.name}</h1>
             <p className="email">{user.email}</p>
             <div className="profile-badges">
-              <span className={`role-badge role-badge--${user.role.toLowerCase().replace('role_', '')}`}>{user.role}</span>
+              <span className={`role-badge role-badge--${user.role.toLowerCase().replace('role_', '')}`}>{roleLabel(user.role)}</span>
               {summary?.freelancerProfile?.verifiedYn && <span className="verified-badge">인증 프로필</span>}
             </div>
           </div>
@@ -1117,17 +1119,17 @@ export default function MyPage2() {
             </div>
 
             <div className="account-card" style={{ marginTop: '1.5rem' }}>
-              <div className="account-card-head">
-                <h2>인증 요청</h2>
-                <button className="btn-edit" onClick={() => void handleCreateVerification()} disabled={saving}>등록</button>
-              </div>
-              <div className="account-edit-form">
-                <div className="account-field">
+                <div className="account-card-head">
+                  <h2>인증 요청</h2>
+                  <button className="btn-edit" onClick={() => void handleCreateVerification()} disabled={saving}>등록</button>
+                </div>
+                <div className="account-edit-form">
+                  <div className="account-field">
                   <label>인증 유형</label>
                   <select className="account-input" value={newVerificationType} onChange={(event) => setNewVerificationType(event.target.value as VerificationType)}>
-                    <option value="BASIC_IDENTITY">기본 신원</option>
-                    <option value="LICENSE">자격증</option>
-                    <option value="CAREGIVER">요양보호사</option>
+                    <option value="BASIC_IDENTITY">{VERIFICATION_TYPE_LABEL.BASIC_IDENTITY}</option>
+                    <option value="LICENSE">{VERIFICATION_TYPE_LABEL.LICENSE}</option>
+                    <option value="CAREGIVER">{VERIFICATION_TYPE_LABEL.CAREGIVER}</option>
                   </select>
                 </div>
                 <div className="account-field">
@@ -1140,11 +1142,11 @@ export default function MyPage2() {
                 {verifications.map((verification) => (
                   <li key={verification.verificationId} className="verify-item">
                     <div className="verify-info">
-                      <div className="verify-name">{verification.type}</div>
+                      <div className="verify-name">{VERIFICATION_TYPE_LABEL[verification.type]}</div>
                       <div className="verify-email">{formatDateTime(verification.requestedAt)}</div>
                     </div>
                     <div className="verify-right">
-                      <span className={`verify-status verify-status--${verification.status.toLowerCase()}`}>{verification.status}</span>
+                      <span className={`verify-status verify-status--${verification.status.toLowerCase()}`}>{verificationStatusLabel(verification.status)}</span>
                       <button className="verify-btn verify-btn--detail" onClick={() => void handleVerificationSelect(verification.verificationId)}>
                         {selectedVerificationId === verification.verificationId ? '닫기' : '상세'}
                       </button>
@@ -1165,8 +1167,8 @@ export default function MyPage2() {
                   </label>
                 </div>
                 <ul className="account-info-list">
-                  <li><span>유형</span><span>{selectedVerification.type}</span></li>
-                  <li><span>상태</span><span>{selectedVerification.status}</span></li>
+                  <li><span>유형</span><span>{VERIFICATION_TYPE_LABEL[selectedVerification.type]}</span></li>
+                  <li><span>상태</span><span>{STATUS_LABEL[selectedVerification.status]}</span></li>
                   <li><span>요청일</span><span>{formatDateTime(selectedVerification.requestedAt)}</span></li>
                   <li><span>반려 사유</span><span>{selectedVerification.rejectReason || '-'}</span></li>
                 </ul>
@@ -1225,7 +1227,7 @@ export default function MyPage2() {
                         <strong>{project.title}</strong>
                         <p className="admin-subtext">작성자 {project.ownerName}</p>
                       </div>
-                      <span className="admin-subtext">{project.status}</span>
+                      <span className="admin-subtext">{projectStatusLabel(project.status)}</span>
                     </div>
                   ))}
                 </div>
@@ -1288,7 +1290,7 @@ export default function MyPage2() {
                     <p className="admin-subtext">{project.owner.name} / {project.projectTypeCode}</p>
                   </div>
                   <div className="admin-item-right">
-                    <span className="skill-tag">{project.status}</span>
+                    <span className="skill-tag">{projectStatusLabel(project.status)}</span>
                     <button className="btn-edit" onClick={() => void handleSelectAdminProject(project.projectId)}>상세</button>
                     <button className="btn-cancel" onClick={() => void handleCancelAdminProject(project.projectId)}>취소</button>
                   </div>
@@ -1300,7 +1302,7 @@ export default function MyPage2() {
               <div className="account-card" style={{ marginTop: '1.5rem' }}>
                 <h2>{selectedAdminProject.title}</h2>
                 <ul className="account-info-list">
-                  <li><span>상태</span><span>{selectedAdminProject.status}</span></li>
+                  <li><span>상태</span><span>{projectStatusLabel(selectedAdminProject.status)}</span></li>
                   <li><span>작성자</span><span>{selectedAdminProject.owner.name}</span></li>
                   <li><span>지역</span><span>{labelOf(regionMap, selectedAdminProject.serviceRegionCode)}</span></li>
                   <li><span>주소</span><span>{selectedAdminProject.serviceAddress}</span></li>

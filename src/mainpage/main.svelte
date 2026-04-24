@@ -6,6 +6,7 @@
   let video: HTMLVideoElement;
   let rafId: number;
   let contactSubmitted = false;
+  let contactError = '';
 
   function handleMouseMove(e: MouseEvent) {
     if (!video?.duration) return;
@@ -21,17 +22,41 @@
     const name = (form.elements.namedItem('name') as HTMLInputElement).value.trim();
     const email = (form.elements.namedItem('email') as HTMLInputElement).value.trim();
     const message = (form.elements.namedItem('message') as HTMLTextAreaElement).value.trim();
-    if (!name || !email || !message) return;
+    if (!name || !email || !message) {
+      contactError = '이름, 이메일, 문의 내용을 모두 입력해 주세요.';
+      contactSubmitted = false;
+      return;
+    }
+
+    contactError = '';
+    const subject = encodeURIComponent(`[이음 문의] ${name}`);
+    const body = encodeURIComponent([
+      `이름: ${name}`,
+      `이메일: ${email}`,
+      '',
+      message,
+    ].join('\n'));
+
+    window.location.href = `mailto:hello@ieum.kr?subject=${subject}&body=${body}`;
     contactSubmitted = true;
     form.reset();
   }
 
-  onMount(() => {
+  onMount(async () => {
     const hash = window.location.hash;
     if (hash) {
       const el = document.querySelector(hash);
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
+
+    const chatRoot = document.createElement('div');
+    document.body.appendChild(chatRoot);
+    const { createRoot, createElement } = await Promise.all([
+      import('react-dom/client').then((m) => m.createRoot),
+      import('react').then((m) => m.createElement),
+    ]).then(([cr, ce]) => ({ createRoot: cr, createElement: ce }));
+    const { default: ChatWidget } = await import('../components/ChatWidget');
+    createRoot(chatRoot).render(createElement(ChatWidget));
   });
 </script>
 
@@ -152,10 +177,13 @@
           <input type="text" name="name" placeholder="이름" class="form-input" />
           <input type="email" name="email" placeholder="이메일" class="form-input" />
           <textarea name="message" placeholder="문의 내용을 입력해주세요" class="form-textarea" rows="4"></textarea>
-          {#if contactSubmitted}
-            <p class="contact-success">문의가 접수되었습니다. 영업일 기준 24시간 내 답변드리겠습니다.</p>
+          {#if contactError}
+            <p class="contact-error">{contactError}</p>
           {/if}
-          <button type="submit" class="btn-primary" disabled={contactSubmitted}>보내기</button>
+          {#if contactSubmitted}
+            <p class="contact-success">메일 작성창을 열었습니다. 보내기만 누르면 문의가 전달됩니다.</p>
+          {/if}
+          <button type="submit" class="btn-primary">보내기</button>
         </form>
       </div>
     </div>

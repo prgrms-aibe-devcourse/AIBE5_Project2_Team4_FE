@@ -56,6 +56,13 @@ export function canSendAnnouncement(user: User | null): boolean {
   return hasRole(user, 'ROLE_ADMIN');
 }
 
+/** 공지 대상 필터링용 실효 역할 — 미인증 프리랜서는 ROLE_USER로 취급 */
+export function effectiveNoticeRole(user: User | null): string | undefined {
+  if (!user) return undefined;
+  if (user.role === 'ROLE_FREELANCER' && !user.verified) return 'ROLE_USER';
+  return user.role;
+}
+
 export function canTransitionProjectTo(
   currentStatus: ProjectStatus,
   nextStatus: 'IN_PROGRESS' | 'COMPLETED',

@@ -5,6 +5,7 @@ import type {
 } from '../../api/admin';
 import type { ReportSummaryResponse } from '../../api/reports';
 import { formatDateTime } from '../../lib/referenceData';
+import { reportReasonLabel, reportStatusLabel } from '../../lib/koreanLabels';
 
 type Props =
   | {
@@ -40,9 +41,9 @@ export default function ReportsTab(props: Props) {
                   <span className="review-date">{formatDateTime(report.createdAt)}</span>
                 </div>
                 <p className="review-content">{report.review.contentSummary || '상세 내용은 관리자 검토 중입니다.'}</p>
-                <p className="admin-subtext">사유: {report.reasonType}{report.reasonDetailSummary ? ` / ${report.reasonDetailSummary}` : ''}</p>
+                <p className="admin-subtext">사유: {reportReasonLabel(report.reasonType)}{report.reasonDetailSummary ? ` / ${report.reasonDetailSummary}` : ''}</p>
                 <div className="review-actions-row">
-                  <span className="review-state-text">처리 상태: {report.status}</span>
+                  <span className="review-state-text">처리 상태: {reportStatusLabel(report.status)}</span>
                   {report.handledAt && <span className="review-state-text">처리 일시: {formatDateTime(report.handledAt)}</span>}
                 </div>
               </li>
@@ -99,13 +100,13 @@ export default function ReportsTab(props: Props) {
                 <li key={report.reportId} className="review-item">
                   <div className="review-header">
                     <div>
-                      <span className="review-service">{report.reasonType}</span>
+                      <span className="review-service">{reportReasonLabel(report.reasonType)}</span>
                       <div className="admin-subtext">신고자 {report.reporter.name}</div>
                     </div>
                     <span className="review-date">{formatDateTime(report.createdAt)}</span>
                   </div>
                   <div className="review-actions-row">
-                    <span className="review-state-text">상태: {report.status}</span>
+                    <span className="review-state-text">상태: {reportStatusLabel(report.status)}</span>
                     <button className="btn-edit" onClick={() => props.onSelectReport(report.reportId)}>상세</button>
                     <button className="btn-edit" onClick={() => props.onResolveReport(report.reportId)}>승인</button>
                     <button className="btn-cancel" onClick={() => props.onRejectReport(report.reportId)}>반려</button>
@@ -118,12 +119,12 @@ export default function ReportsTab(props: Props) {
           {props.selectedReport && (
             <div className="account-card" style={{ marginTop: '1rem' }}>
               <h4>선택한 신고 #{props.selectedReport.reportId}</h4>
-              <p className="admin-subtext">사유: {props.selectedReport.reasonType}</p>
+              <p className="admin-subtext">사유: {reportReasonLabel(props.selectedReport.reasonType)}</p>
               {props.selectedReport.reasonDetail && (
                 <p className="review-content">{props.selectedReport.reasonDetail}</p>
               )}
               <ul className="account-info-list">
-                <li><span>상태</span><span>{props.selectedReport.status}</span></li>
+                <li><span>상태</span><span>{reportStatusLabel(props.selectedReport.status)}</span></li>
                 <li><span>신고자</span><span>{props.selectedReport.reporter.name}</span></li>
                 <li><span>대상 리뷰</span><span>{props.selectedReport.review.projectTitle}</span></li>
                 <li><span>블라인드</span><span>{props.selectedReport.review.blindedYn ? '예' : '아니오'}</span></li>

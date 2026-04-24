@@ -76,6 +76,19 @@ export function getMyProjects(params: {
   return requestJson<ProjectListResponse>(`/api/v1/projects/me${query ? `?${query}` : ''}`);
 }
 
+export function getAllProjects(params: {
+  status?: ProjectStatus;
+  page?: number;
+  size?: number;
+} = {}): Promise<ProjectListResponse> {
+  const search = new URLSearchParams();
+  if (params.status) search.set('status', params.status);
+  if (params.page != null) search.set('page', String(params.page));
+  if (params.size != null) search.set('size', String(params.size));
+  const query = search.toString();
+  return requestJson<ProjectListResponse>(`/api/v1/projects${query ? `?${query}` : ''}`);
+}
+
 export function createProject(request: ProjectCreateRequest): Promise<ProjectCreateResponse> {
   return requestJson<ProjectCreateResponse>('/api/v1/projects', {
     method: 'POST',

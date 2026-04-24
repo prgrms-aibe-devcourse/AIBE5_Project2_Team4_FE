@@ -24,6 +24,66 @@ const REASON_LABELS: Record<string, string> = {
   EXPERIENCED: '활동 경험 풍부',
 };
 
+const MAX_REGION_SELECTION = 5;
+
+type RecommendationChoice = {
+  projectTypeCode: string;
+  serviceRegionCode: string;
+  timeSlotCode: string | null;
+};
+
+function toggleSelection(values: string[], value: string): string[] {
+  return values.includes(value)
+    ? values.filter((current) => current !== value)
+    : [...values, value];
+}
+
+function combineChoices(
+  projectTypeCodes: string[],
+  regionCodes: string[],
+  timeSlotCodes: string[],
+): RecommendationChoice[] {
+  const timeSlots = timeSlotCodes.length > 0 ? timeSlotCodes : [null];
+  const combos: RecommendationChoice[] = [];
+
+  projectTypeCodes.forEach((projectTypeCode) => {
+    regionCodes.forEach((serviceRegionCode) => {
+      timeSlots.forEach((timeSlotCode) => {
+        combos.push({ projectTypeCode, serviceRegionCode, timeSlotCode });
+      });
+    });
+  });
+
+  return combos;
+}
+
+function mergeRecommendations(
+  groups: FreelancerRecommendationItemResponse[][],
+): FreelancerRecommendationItemResponse[] {
+  const merged = new Map<number, FreelancerRecommendationItemResponse>();
+
+  groups.flat().forEach((item) => {
+    const existing = merged.get(item.freelancerProfileId);
+    if (!existing) {
+      merged.set(item.freelancerProfileId, { ...item });
+      return;
+    }
+
+    merged.set(item.freelancerProfileId, {
+      ...existing,
+      matchScore: Math.max(existing.matchScore, item.matchScore),
+      reHireRate: Math.max(existing.reHireRate, item.reHireRate),
+      averageRating: Math.max(existing.averageRating ?? 0, item.averageRating ?? 0) || undefined,
+      activityCount: Math.max(existing.activityCount ?? 0, item.activityCount ?? 0) || undefined,
+      matchReasons: Array.from(new Set([...existing.matchReasons, ...item.matchReasons])),
+    });
+  });
+
+  return Array.from(merged.values())
+    .sort((left, right) => right.matchScore - left.matchScore || right.reHireRate - left.reHireRate || (right.averageRating ?? 0) - (left.averageRating ?? 0))
+    .map((item, index) => ({ ...item, rank: index + 1 }));
+}
+
 function ScoreRing({ score }: { score: number }) {
   const r = 30;
   const circ = 2 * Math.PI * r;
@@ -56,9 +116,9 @@ export default function AiMatchPage() {
   const [regionCodes, setRegionCodes] = useState<CodeLookupResponse[]>([]);
   const [timeSlotCodes, setTimeSlotCodes] = useState<CodeLookupResponse[]>([]);
   const [codeMap, setCodeMap] = useState<Map<string, string>>(new Map());
-  const [selectedType, setSelectedType] = useState<string>('');
-  const [selectedRegion, setSelectedRegion] = useState<string>('');
-  const [selectedTimeSlot, setSelectedTimeSlot] = useState<string>('');
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedRegions, setSelectedRegions] = useState<string[]>([]);
+  const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([]);
   const [results, setResults] = useState<FreelancerRecommendationItemResponse[]>([]);
   const [aiApplied, setAiApplied] = useState(false);
   const [totalCandidates, setTotalCandidates] = useState(0);
@@ -83,7 +143,7 @@ export default function AiMatchPage() {
 
   async function handleStart(e: { preventDefault(): void }) {
     e.preventDefault();
-    if (!selectedType || !selectedRegion) return;
+    if (selectedTypes.length === 0 || selectedRegions.length === 0) return;
 
     setStep('loading');
     setLoadStep(0);
@@ -95,15 +155,20 @@ export default function AiMatchPage() {
     }
 
     try {
-      const response = await recommendFreelancers({
-        projectTypeCode: selectedType,
-        serviceRegionCode: selectedRegion,
-        timeSlotCode: selectedTimeSlot || null,
-        size: 6,
-      });
-      setResults(response.recommendations);
-      setAiApplied(response.aiApplied);
-      setTotalCandidates(response.totalCandidates);
+      const combinations = combineChoices(selectedTypes, selectedRegions, selectedTimeSlots);
+      const responses = await Promise.all(
+        combinations.map((choice) => recommendFreelancers({
+          projectTypeCode: choice.projectTypeCode,
+          serviceRegionCode: choice.serviceRegionCode,
+          timeSlotCode: choice.timeSlotCode,
+          size: 6,
+        })),
+      );
+
+      const mergedResults = mergeRecommendations(responses.map((response) => response.recommendations));
+      setResults(mergedResults.slice(0, 6));
+      setAiApplied(responses.some((response) => response.aiApplied));
+      setTotalCandidates(responses.reduce((sum, response) => sum + response.totalCandidates, 0));
       setStep('results');
     } catch (err) {
       setError(getErrorMessage(err, '매칭 중 오류가 발생했습니다.'));
@@ -113,14 +178,18 @@ export default function AiMatchPage() {
 
   function handleReset() {
     setStep('form');
-    setSelectedType('');
-    setSelectedRegion('');
-    setSelectedTimeSlot('');
+    setSelectedTypes([]);
+    setSelectedRegions([]);
+    setSelectedTimeSlots([]);
     setResults([]);
     setLoadStep(0);
   }
 
-  const canSubmit = selectedType && selectedRegion;
+  const canSubmit = selectedTypes.length > 0 && selectedRegions.length > 0;
+  const selectedTypeLabel = selectedTypes.map((code) => labelOf(codeMap, code)).join(', ');
+  const selectedRegionLabel = selectedRegions.map((code) => labelOf(codeMap, code)).join(', ');
+  const selectedTimeSlotLabel = selectedTimeSlots.map((code) => labelOf(codeMap, code)).join(', ');
+  const regionLimitReached = selectedRegions.length >= MAX_REGION_SELECTION;
 
   return (
     <div className="am-page">
@@ -137,14 +206,14 @@ export default function AiMatchPage() {
             <form onSubmit={handleStart}>
               {projectTypeCodes.length > 0 && (
                 <section className="am-section">
-                  <div className="am-section-label">서비스 유형 <span style={{ color: '#e07070' }}>*</span></div>
+                  <div className="am-section-label">서비스 유형 <span style={{ color: '#e07070' }}>*</span> <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(복수 선택 가능)</span></div>
                   <div className="am-service-grid">
                     {projectTypeCodes.map((type) => (
                       <button
                         key={type.code}
                         type="button"
-                        className={`am-service-card${selectedType === type.code ? ' selected' : ''}`}
-                        onClick={() => setSelectedType((prev) => (prev === type.code ? '' : type.code))}
+                        className={`am-service-card${selectedTypes.includes(type.code) ? ' selected' : ''}`}
+                        onClick={() => setSelectedTypes((prev) => toggleSelection(prev, type.code))}
                       >
                         <span className="am-service-icon">◈</span>
                         <span className="am-service-label">{type.name}</span>
@@ -156,14 +225,30 @@ export default function AiMatchPage() {
 
               {regionCodes.length > 0 && (
                 <section className="am-section">
-                  <div className="am-section-label">활동 지역 <span style={{ color: '#e07070' }}>*</span></div>
+                  <div className="am-section-label">활동 지역 <span style={{ color: '#e07070' }}>*</span> <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(복수 선택 가능)</span></div>
+                  <p style={{ marginBottom: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
+                    최대 {MAX_REGION_SELECTION}개까지 선택할 수 있습니다. 현재 {selectedRegions.length}개 선택됨.
+                  </p>
                   <div className="am-chip-group">
                     {regionCodes.map((region) => (
                       <button
                         key={region.code}
                         type="button"
-                        className={`am-chip${selectedRegion === region.code ? ' selected' : ''}`}
-                        onClick={() => setSelectedRegion((prev) => (prev === region.code ? '' : region.code))}
+                        className={`am-chip${selectedRegions.includes(region.code) ? ' selected' : ''}`}
+                        onClick={() => {
+                          if (selectedRegions.includes(region.code)) {
+                            setSelectedRegions((prev) => toggleSelection(prev, region.code));
+                            return;
+                          }
+
+                          if (regionLimitReached) {
+                            setError(`활동 지역은 최대 ${MAX_REGION_SELECTION}개까지 선택할 수 있습니다.`);
+                            return;
+                          }
+
+                          setError('');
+                          setSelectedRegions((prev) => toggleSelection(prev, region.code));
+                        }}
                       >
                         {region.name}
                       </button>
@@ -174,14 +259,14 @@ export default function AiMatchPage() {
 
               {timeSlotCodes.length > 0 && (
                 <section className="am-section">
-                  <div className="am-section-label">선호 시간대 <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(선택)</span></div>
+                  <div className="am-section-label">선호 시간대 <span style={{ color: 'var(--text-secondary)', fontWeight: 400 }}>(복수 선택 가능)</span></div>
                   <div className="am-chip-group">
                     {timeSlotCodes.map((slot) => (
                       <button
                         key={slot.code}
                         type="button"
-                        className={`am-chip${selectedTimeSlot === slot.code ? ' selected' : ''}`}
-                        onClick={() => setSelectedTimeSlot((prev) => (prev === slot.code ? '' : slot.code))}
+                        className={`am-chip${selectedTimeSlots.includes(slot.code) ? ' selected' : ''}`}
+                        onClick={() => setSelectedTimeSlots((prev) => toggleSelection(prev, slot.code))}
                       >
                         {slot.name}
                       </button>
@@ -232,9 +317,9 @@ export default function AiMatchPage() {
                   )}
                 </h2>
                 <p className="am-result-subtitle">
-                  {labelOf(codeMap, selectedType)} · {labelOf(codeMap, selectedRegion)}
-                  {selectedTimeSlot && ` · ${labelOf(codeMap, selectedTimeSlot)}`}
-                  {` 기준 전체 후보 ${totalCandidates}명 중 매칭 결과입니다.`}
+                  {selectedTypeLabel} · {selectedRegionLabel}
+                  {selectedTimeSlotLabel && ` · ${selectedTimeSlotLabel}`}
+                  {` 기준 추천 결과입니다. (전체 후보 합계 ${totalCandidates}명)`}
                 </p>
               </div>
               <button type="button" className="am-reset-btn" onClick={handleReset}>

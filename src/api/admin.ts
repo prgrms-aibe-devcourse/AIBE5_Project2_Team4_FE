@@ -253,6 +253,11 @@ export interface AdminNoticeResponse {
   admin: AdminUserSummaryResponse;
 }
 
+export interface AdminNoticeUpdateRequest {
+  title: string;
+  content: string;
+}
+
 function toQuery(params: Record<string, string | number | boolean | undefined | null>): string {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
@@ -409,6 +414,22 @@ export function createAdminNotice(request: {
   return requestJson<AdminNoticeResponse>('/api/v1/admin/notices', {
     method: 'POST',
     body: request,
+  });
+}
+
+export function updateAdminNotice(
+  noticeId: number,
+  request: AdminNoticeUpdateRequest,
+): Promise<AdminNoticeResponse> {
+  return requestJson<AdminNoticeResponse>(`/api/v1/admin/notices/${noticeId}`, {
+    method: 'PATCH',
+    body: request,
+  });
+}
+
+export function deleteAdminNotice(noticeId: number): Promise<void> {
+  return requestJson<void>(`/api/v1/admin/notices/${noticeId}`, {
+    method: 'DELETE',
   });
 }
 

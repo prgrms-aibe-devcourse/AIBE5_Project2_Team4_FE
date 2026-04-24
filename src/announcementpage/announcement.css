@@ -194,10 +194,42 @@
   white-space: nowrap;
 }
 
-.ann-type-badge--general { background: rgba(155,168,130,0.15); color: var(--green-accent);   border: 1px solid rgba(155,168,130,0.3); }
-.ann-type-badge--urgent  { background: rgba(224,112,112,0.15); color: #e07070;               border: 1px solid rgba(224,112,112,0.3); }
-.ann-type-badge--system  { background: rgba(106,174,214,0.15); color: #6aaed6;               border: 1px solid rgba(106,174,214,0.3); }
-.ann-type-badge--event   { background: rgba(212,168,75,0.15);  color: #d4a84b;               border: 1px solid rgba(212,168,75,0.3); }
+.ann-type-badge--general    { background: rgba(155,168,130,0.15); color: var(--green-accent); border: 1px solid rgba(155,168,130,0.3); }
+.ann-type-badge--urgent     { background: rgba(224,112,112,0.15); color: #e07070;              border: 1px solid rgba(224,112,112,0.3); }
+.ann-type-badge--system     { background: rgba(106,174,214,0.15); color: #6aaed6;              border: 1px solid rgba(106,174,214,0.3); }
+.ann-type-badge--event      { background: rgba(212,168,75,0.15);  color: #d4a84b;              border: 1px solid rgba(212,168,75,0.3); }
+.ann-type-badge--freelancer { background: rgba(106,174,214,0.15); color: #6aaed6;              border: 1px solid rgba(106,174,214,0.3); }
+.ann-type-badge--user       { background: rgba(212,168,75,0.15);  color: #d4a84b;              border: 1px solid rgba(212,168,75,0.3); }
+
+/* ─── 대상 선택 버튼 ─────────────────────────────────────── */
+.ann-target-selector {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ann-target-btn {
+  background: transparent;
+  border: 1px solid var(--line-soft, #3a3a3a);
+  border-radius: 20px;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.85rem;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ann-target-btn:hover {
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+}
+
+.ann-target-btn.active {
+  background: rgba(155, 168, 130, 0.12);
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+  font-weight: 600;
+}
 
 /* ─── admin form ─────────────────────────────────────── */
 .ann-admin-form {
@@ -266,6 +298,14 @@
   flex-wrap: wrap;
 }
 
+.ann-modal-actions,
+.ann-draft-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 0.5rem;
+}
+
 .ann-submit-btn {
   background: var(--green-accent);
   color: var(--dark-bg);
@@ -283,6 +323,53 @@
 .ann-submit-btn:hover:not(:disabled) { background: var(--green-dark); }
 .ann-submit-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
+.ann-cancel-btn {
+  background: transparent;
+  border: 1px solid #3a3a3a;
+  border-radius: 10px;
+  padding: 0.75rem 1.4rem;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease;
+}
+
+.ann-cancel-btn:hover:not(:disabled) {
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+}
+
+.ann-cancel-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ann-delete-btn {
+  background: transparent;
+  border: 1px solid #6c2f2f;
+  border-radius: 10px;
+  padding: 0.75rem 1.4rem;
+  color: #e07070;
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s ease, color 0.2s ease, background-color 0.2s ease;
+}
+
+.ann-delete-btn:hover:not(:disabled) {
+  border-color: #e07070;
+  color: #ff9b9b;
+  background: rgba(224, 112, 112, 0.08);
+}
+
+.ann-delete-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
 /* ─── draft box ──────────────────────────────────────── */
 .ann-draft-box {
   background: rgba(212, 168, 75, 0.07);
@@ -290,10 +377,14 @@
   border-radius: 12px;
   padding: 1.1rem 1.25rem;
   display: flex;
-  align-items: center;
-  gap: 1rem;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 0.8rem;
   margin-top: -0.5rem;
+}
+
+.ann-admin-form--edit,
+.ann-admin-form--draft {
+  margin-top: 0.5rem;
 }
 
 .ann-draft-title {

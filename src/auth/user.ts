@@ -24,6 +24,7 @@ interface UserShape {
   activeYn?: boolean | null;
   phone?: string | null;
   intro?: string | null;
+  verifiedYn?: boolean | null;
 }
 
 function resolveRole(input: UserShape): UserRole {
@@ -49,5 +50,6 @@ export function normalizeUser(input: UserShape): User {
     phone: input.phone?.trim() || undefined,
     intro,
     bio: intro,
+    verified: input.verifiedYn ?? undefined,
   };
 }

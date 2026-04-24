@@ -27,6 +27,7 @@ interface Props {
   onStartProject: (proposalId: number) => void;
   onCompleteProject: (proposalId: number) => void;
   onWriteReview?: (projectId: number, projectTitle: string) => void;
+  onViewProject?: (proposalId: number) => void;
 }
 
 export default function ProposalTab({
@@ -38,6 +39,7 @@ export default function ProposalTab({
   onStartProject,
   onCompleteProject,
   onWriteReview,
+  onViewProject,
 }: Props) {
   return (
     <>
@@ -69,6 +71,16 @@ export default function ProposalTab({
               )}
 
               <div className="proposal-card-actions">
+                {onViewProject && (
+                  <button
+                    type="button"
+                    className="proposal-btn proposal-btn--review"
+                    disabled={loading}
+                    onClick={() => onViewProject(proposal.proposalId)}
+                  >
+                    프로젝트 열람
+                  </button>
+                )}
                 {proposal.proposalStatus === 'PENDING' && (
                   <>
                     <button

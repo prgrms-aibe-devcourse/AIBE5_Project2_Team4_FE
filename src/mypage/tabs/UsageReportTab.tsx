@@ -6,6 +6,7 @@ import type {
   AdminReviewListItemResponse,
 } from '../../api/admin';
 import { formatDateTime } from '../../lib/referenceData';
+import { projectStatusLabel, reportReasonLabel, verificationTypeLabel } from '../../lib/koreanLabels';
 
 interface Props {
   dashboard: AdminDashboardResponse | null;
@@ -74,11 +75,11 @@ export default function UsageReportTab({ dashboard, freelancers, projects, revie
 
       <h2 className="report-section-title">프로젝트 상태 분포</h2>
       <div className="report-bars-card">
-        <BarRow label="요청" count={requestedProjects} total={totalProjects} color="#6c8ebf" />
-        <BarRow label="수락" count={acceptedProjects} total={totalProjects} color="#82b366" />
-        <BarRow label="진행중" count={inProgressProjects} total={totalProjects} color="#d6b656" />
-        <BarRow label="완료" count={completedProjects} total={totalProjects} color="var(--green-accent)" />
-        <BarRow label="취소" count={cancelledProjects} total={totalProjects} color="#666" />
+              <BarRow label={projectStatusLabel('REQUESTED')} count={requestedProjects} total={totalProjects} color="#6c8ebf" />
+        <BarRow label={projectStatusLabel('ACCEPTED')} count={acceptedProjects} total={totalProjects} color="#82b366" />
+        <BarRow label={projectStatusLabel('IN_PROGRESS')} count={inProgressProjects} total={totalProjects} color="#d6b656" />
+        <BarRow label={projectStatusLabel('COMPLETED')} count={completedProjects} total={totalProjects} color="var(--green-accent)" />
+        <BarRow label={projectStatusLabel('CANCELLED')} count={cancelledProjects} total={totalProjects} color="#666" />
       </div>
 
       <h2 className="report-section-title">검증/신고 현황</h2>
@@ -96,7 +97,7 @@ export default function UsageReportTab({ dashboard, freelancers, projects, revie
               <div key={item.verificationId} className="admin-item">
                 <div>
                   <strong>{item.applicantName}</strong>
-                  <p className="admin-subtext">{item.verificationType}</p>
+                  <p className="admin-subtext">{verificationTypeLabel(item.verificationType)}</p>
                 </div>
                 <span className="admin-subtext">{formatDateTime(item.requestedAt)}</span>
               </div>
@@ -108,7 +109,7 @@ export default function UsageReportTab({ dashboard, freelancers, projects, revie
             {dashboard.recentReports.map((item) => (
               <div key={item.reportId} className="admin-item">
                 <div>
-                  <strong>{item.reasonType}</strong>
+                  <strong>{reportReasonLabel(item.reasonType)}</strong>
                   <p className="admin-subtext">신고자 {item.reporterName}</p>
                 </div>
                 <span className="admin-subtext">{formatDateTime(item.createdAt)}</span>

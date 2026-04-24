@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import './appHeader.css';
   import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
-  import { canSendAnnouncement } from '../store/accessControl';
+  import { canSendAnnouncement, effectiveNoticeRole } from '../store/accessControl';
   import { getTheme, setTheme, THEME_EVENT, type AppTheme } from '../store/theme';
   import {
     getNotifications,
@@ -47,6 +47,17 @@
     }
   }
 
+  function isNoticeVisibleToRole(notification: NotificationSummaryResponse): boolean {
+    if (notification.notificationType !== 'NOTICE') return true;
+    const text = `${notification.title} ${notification.content}`;
+    const hasFR = text.includes('[FR]');
+    const hasUSR = text.includes('[USR]');
+    if (!hasFR && !hasUSR) return true;
+    const role = effectiveNoticeRole(user);
+    if (hasFR) return role === 'ROLE_FREELANCER';
+    return role === 'ROLE_USER';
+  }
+
   function getNotificationMeta(notification: NotificationSummaryResponse): string {
     if (!notification.isRead) {
       return '읽지 않음';
@@ -64,8 +75,8 @@
 
     try {
       const response = await getNotifications({ page: 0, size: 20 });
-      notifications = response.content;
-      unreadCount = response.unreadCount;
+      notifications = response.content.filter(isNoticeVisibleToRole);
+      unreadCount = notifications.filter((n) => !n.isRead).length;
     } catch {
       notifications = [];
       unreadCount = 0;

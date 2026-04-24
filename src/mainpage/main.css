@@ -313,6 +313,12 @@
   gap: 1rem;
 }
 
+.contact-error {
+  color: #e07070;
+  font-size: 0.875rem;
+  margin: 0;
+}
+
 .contact-success {
   color: var(--green-accent);
   font-size: 0.875rem;

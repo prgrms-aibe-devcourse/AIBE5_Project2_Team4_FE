@@ -1,10 +1,20 @@
-import { getMyProfile } from '../api/users';
+import { getMyPage, getMyProfile } from '../api/users';
 import * as authApi from '../api/auth';
 import { registerUnauthorizedHandler } from '../api/client';
 import { clearTokens, getRefreshToken, hasAnyToken, setTokens } from './tokenStorage';
 import { normalizeUser, type User } from './user';
 
 export const AUTH_USER_EVENT = 'app-auth-user-change';
+
+async function resolveVerifiedYn(profile: { roleCode?: string | null }): Promise<boolean | undefined> {
+  if (profile.roleCode !== 'ROLE_FREELANCER') return undefined;
+  try {
+    const myPage = await getMyPage();
+    return myPage.freelancerProfile?.verifiedYn ?? false;
+  } catch {
+    return undefined;
+  }
+}
 
 let currentUser: User | null = null;
 let bootstrapPromise: Promise<User | null> | null = null;
@@ -77,8 +87,9 @@ export async function bootstrapAuthSession(force = false): Promise<User | null> 
 
     try {
       const profile = await getMyProfile();
+      const verifiedYn = await resolveVerifiedYn(profile);
       bootstrapped = true;
-      return setCurrentUser(normalizeUser(profile));
+      return setCurrentUser(normalizeUser({ ...profile, verifiedYn }));
     } catch {
       clearSession();
       bootstrapped = true;
@@ -95,16 +106,18 @@ export async function loginSession(email: string, password: string): Promise<Use
   const response = await authApi.login({ email, password });
   setTokens(response.accessToken, response.refreshToken);
   const profile = await getMyProfile();
+  const verifiedYn = await resolveVerifiedYn(profile);
   bootstrapped = true;
-  return updateCurrentUser(normalizeUser(profile));
+  return updateCurrentUser(normalizeUser({ ...profile, verifiedYn }));
 }
 
 export async function kakaoLoginSession(request: authApi.KakaoLoginRequest): Promise<User> {
   const response = await authApi.kakaoLogin(request);
   setTokens(response.accessToken, response.refreshToken);
   const profile = await getMyProfile();
+  const verifiedYn = await resolveVerifiedYn(profile);
   bootstrapped = true;
-  return updateCurrentUser(normalizeUser(profile));
+  return updateCurrentUser(normalizeUser({ ...profile, verifiedYn }));
 }
 
 export async function signupSession(request: authApi.AuthSignupRequest): Promise<authApi.AuthSignupResponse> {

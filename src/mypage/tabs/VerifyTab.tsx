@@ -3,7 +3,7 @@ import type {
   AdminVerificationListItemResponse,
 } from '../../api/admin';
 import { formatDateTime } from '../../lib/referenceData';
-import { STATUS_LABEL, type VerifyStatus } from './verifyTabShared';
+import { STATUS_LABEL, VERIFICATION_TYPE_LABEL, type VerifyStatus } from './verifyTabShared';
 
 interface Props {
   verifications: AdminVerificationListItemResponse[];
@@ -59,10 +59,10 @@ export default function VerifyTab({
                 <div className="verify-info">
                   <div className="verify-name">{verification.applicantName}</div>
                   <div className="verify-email">{verification.applicantEmail}</div>
-                  <div className="verify-skills">
-                    <span className="skill-tag">{verification.verificationType}</span>
+                <div className="verify-skills">
+                    <span className="skill-tag">{VERIFICATION_TYPE_LABEL[verification.verificationType]}</span>
                     {verification.hasFiles && <span className="skill-tag">첨부파일 있음</span>}
-                  </div>
+                </div>
                 </div>
               </div>
 
@@ -104,7 +104,7 @@ export default function VerifyTab({
                 <div className="vd-name">{selectedVerification.freelancer.name}</div>
                 <div className="vd-email">{selectedVerification.freelancer.email}</div>
                 <div className="vd-stats">
-                  <span>{selectedVerification.verificationType}</span>
+                  <span>{VERIFICATION_TYPE_LABEL[selectedVerification.verificationType]}</span>
                   <span>{selectedVerification.freelancer.verifiedYn ? '기존 인증자' : '신규 인증 요청'}</span>
                 </div>
               </div>
@@ -155,7 +155,7 @@ export default function VerifyTab({
               <div className="vd-section-label">처리 정보</div>
               <ul className="vd-info-list">
                 <li><span>요청일</span><span>{formatDateTime(selectedVerification.requestedAt)}</span></li>
-                <li><span>상태</span><span>{selectedVerification.status}</span></li>
+                <li><span>상태</span><span>{STATUS_LABEL[selectedVerification.status]}</span></li>
                 <li><span>검토자</span><span>{selectedVerification.reviewedBy?.name || '-'}</span></li>
                 <li><span>검토일</span><span>{formatDateTime(selectedVerification.reviewedAt)}</span></li>
                 <li><span>반려 사유</span><span>{selectedVerification.rejectReason || '-'}</span></li>

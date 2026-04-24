@@ -6,6 +6,7 @@ import {
   cancelProject,
   completeProject,
   createProject,
+  getAllProjects,
   getMyProjects,
   getProject,
   startProject,
@@ -21,6 +22,7 @@ import {
   getMyFreelancerProposals,
   getProjectProposals,
   rejectProposal,
+  type ProposalStatus,
   type ProjectProposalSummaryResponse,
   type ProposalDetailResponse,
   type ProposalSummaryResponse,
@@ -37,6 +39,7 @@ import {
 import { getProjectTypeCodes, getRegionCodes } from '../api/codes';
 import { getErrorMessage } from '../lib/errors';
 import { formatDateTime, labelOf } from '../lib/referenceData';
+import { proposalStatusLabel } from '../lib/koreanLabels';
 import ProjectFormModal, { type ProjectFormValues } from './ProjectFormModal';
 import ProposalTab from './ProposalTab';
 import ReviewModal from './ReviewModal';
@@ -44,12 +47,21 @@ import ReviewModal from './ReviewModal';
 type StatusFilter = 'ALL' | ProjectStatus;
 
 const PROJECT_STATUSES: ProjectStatus[] = ['REQUESTED', 'ACCEPTED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED'];
+const ALL_PROJECTS_PAGE_SIZE = 9;
 const PROJECT_STATUS_LABEL: Record<ProjectStatus, string> = {
   REQUESTED: '요청',
   ACCEPTED: '수락',
   IN_PROGRESS: '진행 중',
   COMPLETED: '완료',
   CANCELLED: '취소',
+};
+
+const PROPOSAL_STATUS_LABEL: Record<ProposalStatus, string> = {
+  PENDING: '대기 중',
+  ACCEPTED: '수락됨',
+  REJECTED: '거절됨',
+  EXPIRED: '만료됨',
+  CANCELLED: '취소됨',
 };
 
 const STATUS_COLOR: Record<ProjectStatus, string> = {
@@ -130,11 +142,20 @@ export default function ProjectPage3() {
   const [error, setError] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('ALL');
   const [projects, setProjects] = useState<ProjectSummaryResponse[]>([]);
+  const [allProjects, setAllProjects] = useState<ProjectSummaryResponse[]>([]);
+  const [allProjectsPage, setAllProjectsPage] = useState(0);
+  const [allProjectsTotalPages, setAllProjectsTotalPages] = useState(0);
+  const [allProjectsFilter, setAllProjectsFilter] = useState<StatusFilter>('ALL');
+  const [allProjectsUnavailable, setAllProjectsUnavailable] = useState(false);
+  const [allProjectsLoading, setAllProjectsLoading] = useState(false);
   const [freelancerProposals, setFreelancerProposals] = useState<ProposalSummaryResponse[]>([]);
   const [myReviews, setMyReviews] = useState<Record<number, ReviewSummaryResponse>>({});
   const [selectedProject, setSelectedProject] = useState<ProjectDetailResponse | null>(null);
   const [selectedProjectProposals, setSelectedProjectProposals] = useState<ProjectProposalSummaryResponse[]>([]);
   const [selectedReview, setSelectedReview] = useState<ReviewDetailResponse | null>(null);
+  const [selectedFreelancerProject, setSelectedFreelancerProject] = useState<ProposalDetailResponse | null>(null);
+  const [freelancerProjectLoading, setFreelancerProjectLoading] = useState(false);
+  const [freelancerProjectError, setFreelancerProjectError] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [createError, setCreateError] = useState('');
@@ -156,6 +177,11 @@ export default function ProjectPage3() {
   const filteredProjects = useMemo(
     () => statusFilter === 'ALL' ? projects : projects.filter((project) => project.status === statusFilter),
     [projects, statusFilter],
+  );
+
+  const acceptedFreelancerProjects = useMemo(
+    () => freelancerProposals.filter((proposal) => proposal.proposalStatus === 'ACCEPTED'),
+    [freelancerProposals],
   );
 
   useEffect(() => {
@@ -217,6 +243,7 @@ export default function ProjectPage3() {
               myReviewPage.content.map((review) => [review.projectId, review]),
             ),
           );
+
         }
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프로젝트 데이터를 불러오지 못했습니다.'));
@@ -227,6 +254,38 @@ export default function ProjectPage3() {
 
     void initialize();
   }, [user]);
+
+  useEffect(() => {
+    if (!user || user.role !== 'ROLE_FREELANCER') {
+      return;
+    }
+
+    const loadAllProjects = async () => {
+      setAllProjectsLoading(true);
+      setAllProjectsUnavailable(false);
+
+      try {
+        const response = await getAllProjects({
+          page: allProjectsPage,
+          size: ALL_PROJECTS_PAGE_SIZE,
+          status: allProjectsFilter === 'ALL' ? undefined : allProjectsFilter,
+        });
+        setAllProjects(response.content);
+        setAllProjectsTotalPages(response.totalPages);
+        if (response.page !== allProjectsPage) {
+          setAllProjectsPage(response.page);
+        }
+      } catch {
+        setAllProjects([]);
+        setAllProjectsTotalPages(0);
+        setAllProjectsUnavailable(true);
+      } finally {
+        setAllProjectsLoading(false);
+      }
+    };
+
+    void loadAllProjects();
+  }, [allProjectsFilter, allProjectsPage, user]);
 
   async function refreshUserProjects() {
     const response = await getMyProjects({ page: 0, size: 50 });
@@ -370,6 +429,25 @@ export default function ProjectPage3() {
     setShowReviewModal(true);
   }
 
+  async function openFreelancerProjectDetail(proposalId: number) {
+    setFreelancerProjectLoading(true);
+    setFreelancerProjectError('');
+
+    try {
+      const detail = await getMyFreelancerProposal(proposalId);
+      setSelectedFreelancerProject(detail);
+    } catch (caughtError) {
+      setFreelancerProjectError(getErrorMessage(caughtError, '프로젝트 상세를 불러오지 못했습니다.'));
+    } finally {
+      setFreelancerProjectLoading(false);
+    }
+  }
+
+  function closeFreelancerProjectDetail() {
+    setSelectedFreelancerProject(null);
+    setFreelancerProjectError('');
+  }
+
   function openFreelancerReviewModal(projectId: number, projectTitle: string) {
     const existingSummary = myReviews[projectId];
     const existingReview: ReviewDetailResponse | null = existingSummary ? { ...existingSummary } : null;
@@ -470,6 +548,22 @@ export default function ProjectPage3() {
   const isUser = user.role === 'ROLE_USER';
   const isFreelancer = user.role === 'ROLE_FREELANCER';
 
+  function scrollToSection(sectionId: string) {
+    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleAllProjectsFilterChange(nextFilter: StatusFilter) {
+    setAllProjectsFilter(nextFilter);
+    setAllProjectsPage(0);
+  }
+
+  function handleAllProjectsPageChange(nextPage: number) {
+    if (nextPage < 0 || nextPage >= allProjectsTotalPages) {
+      return;
+    }
+    setAllProjectsPage(nextPage);
+  }
+
   return (
     <div className="project-page">
       <AppHeader activePage="project" />
@@ -480,7 +574,7 @@ export default function ProjectPage3() {
             <h1 className="project-title">프로젝트</h1>
             <p className="project-subtitle">
               {isUser && '내 프로젝트를 생성하고 진행 상태를 확인할 수 있습니다.'}
-              {isFreelancer && '받은 제안을 검토하고 프로젝트 상태를 업데이트할 수 있습니다.'}
+              {isFreelancer && '모든 프로젝트를 열람하고 받은 제안을 검토할 수 있습니다.'}
               {!isUser && !isFreelancer && '관리자 기능은 마이페이지의 관리자 탭에서 확인할 수 있습니다.'}
             </p>
           </div>
@@ -542,16 +636,165 @@ export default function ProjectPage3() {
             )}
           </>
         ) : isFreelancer ? (
-          <ProposalTab
-            proposals={freelancerProposals}
-            loading={mutationLoading}
-            reviewedProjectIds={new Set(Object.keys(myReviews).map(Number))}
-            onAccept={(proposalId) => void handleProposalAccept(proposalId)}
-            onReject={(proposalId) => void handleProposalReject(proposalId)}
-            onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}
-            onCompleteProject={(proposalId) => void transitionProposalProject(proposalId, 'complete')}
-            onWriteReview={(projectId, projectTitle) => openFreelancerReviewModal(projectId, projectTitle)}
-          />
+          <>
+            <nav className="project-nav" aria-label="프리랜서 프로젝트 내비게이션">
+              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-all-projects')}>
+                전체 프로젝트
+              </button>
+              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-active-projects')}>
+                참여 프로젝트
+              </button>
+              <button type="button" className="project-nav-item" onClick={() => scrollToSection('freelancer-proposals')}>
+                받은 제안
+              </button>
+            </nav>
+
+            <section className="project-section" id="freelancer-all-projects">
+              <div className="project-header">
+                <div>
+                  <h2 className="project-title" style={{ fontSize: '1.35rem' }}>전체 프로젝트</h2>
+                  <p className="project-subtitle">모든 프로젝트를 열람할 수 있습니다.</p>
+                </div>
+              </div>
+
+              <div className="filter-bar">
+                {(['ALL', ...PROJECT_STATUSES] as StatusFilter[]).map((filter) => (
+                  <button
+                    key={filter}
+                    type="button"
+                    className={`filter-chip${allProjectsFilter === filter ? ' active' : ''}`}
+                    onClick={() => handleAllProjectsFilterChange(filter)}
+                  >
+                    {filter === 'ALL' ? '전체' : PROJECT_STATUS_LABEL[filter]}
+                  </button>
+                ))}
+              </div>
+
+              {allProjectsUnavailable ? (
+                <div className="project-empty"><p>전체 프로젝트 목록을 불러올 수 없습니다.</p></div>
+              ) : allProjectsLoading ? (
+                <div className="project-empty"><p>전체 프로젝트를 불러오는 중입니다.</p></div>
+              ) : allProjects.length === 0 ? (
+                <div className="project-empty"><p>조건에 맞는 프로젝트가 없습니다.</p></div>
+              ) : (
+                <>
+                  <ul className="project-list">
+                    {allProjects.map((project) => (
+                    <li
+                      key={project.projectId}
+                      className="project-card"
+                      onClick={() => void openProjectDetail(project.projectId)}
+                    >
+                      <div className="project-card-top">
+                        <span className="project-type-badge">{labelOf(projectTypeMap, project.projectTypeCode)}</span>
+                        <span className={`project-status ${STATUS_COLOR[project.status]}`}>
+                          {PROJECT_STATUS_LABEL[project.status]}
+                        </span>
+                      </div>
+                      <h3 className="project-card-title">{project.title}</h3>
+                      <div className="project-card-meta">
+                        <span>일정 {formatDateTime(project.requestedStartAt)}</span>
+                        <span>지역 {labelOf(regionMap, project.serviceRegionCode)}</span>
+                      </div>
+                    </li>
+                    ))}
+                  </ul>
+
+                  {allProjectsTotalPages > 1 && (
+                    <div className="project-pagination" aria-label="전체 프로젝트 페이지 이동">
+                      <button
+                        type="button"
+                        className="project-page-btn"
+                        disabled={allProjectsPage === 0 || allProjectsLoading}
+                        onClick={() => handleAllProjectsPageChange(allProjectsPage - 1)}
+                      >
+                        이전
+                      </button>
+
+                      {Array.from({ length: allProjectsTotalPages }, (_, pageIndex) => pageIndex).map((pageIndex) => (
+                        <button
+                          key={pageIndex}
+                          type="button"
+                          className={`project-page-btn${allProjectsPage === pageIndex ? ' active' : ''}`}
+                          disabled={allProjectsLoading}
+                          onClick={() => handleAllProjectsPageChange(pageIndex)}
+                        >
+                          {pageIndex + 1}
+                        </button>
+                      ))}
+
+                      <button
+                        type="button"
+                        className="project-page-btn"
+                        disabled={allProjectsPage >= allProjectsTotalPages - 1 || allProjectsLoading}
+                        onClick={() => handleAllProjectsPageChange(allProjectsPage + 1)}
+                      >
+                        다음
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </section>
+
+            <section className="project-section" id="freelancer-active-projects">
+              <div className="project-header">
+                <div>
+                  <h2 className="project-title" style={{ fontSize: '1.35rem' }}>참여 프로젝트</h2>
+                  <p className="project-subtitle">수락된 프로젝트를 먼저 확인할 수 있습니다.</p>
+                </div>
+              </div>
+
+              {acceptedFreelancerProjects.length === 0 ? (
+                <div className="project-empty"><p>수락된 프로젝트가 없습니다.</p></div>
+              ) : (
+                <ul className="proposal-list">
+                  {acceptedFreelancerProjects.map((proposal) => (
+                    <li key={proposal.proposalId} className="proposal-card">
+                      <div className="proposal-card-top">
+                        <div className="proposal-card-meta">
+                          <span className="project-type-badge">참여중</span>
+                          <span className={`project-status ${STATUS_COLOR[proposal.projectStatus]}`}>
+                            {PROJECT_STATUS_LABEL[proposal.projectStatus]}
+                          </span>
+                        </div>
+                        <span className="proposal-card-date">{formatDateTime(proposal.createdAt)}</span>
+                      </div>
+                      <h3 className="proposal-card-title">{proposal.projectTitle}</h3>
+                      <div className="proposal-card-info">
+                        <span>프로젝트 상태: {PROJECT_STATUS_LABEL[proposal.projectStatus]}</span>
+                        <span>제안 상태: {PROPOSAL_STATUS_LABEL[proposal.proposalStatus]}</span>
+                      </div>
+                      <div className="proposal-card-actions">
+                        <button
+                          type="button"
+                          className="proposal-btn proposal-btn--review"
+                          disabled={freelancerProjectLoading}
+                          onClick={() => void openFreelancerProjectDetail(proposal.proposalId)}
+                        >
+                          프로젝트 열람
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+
+            <section className="project-section" id="freelancer-proposals">
+            <ProposalTab
+              proposals={freelancerProposals}
+              loading={mutationLoading}
+              reviewedProjectIds={new Set(Object.keys(myReviews).map(Number))}
+              onAccept={(proposalId) => void handleProposalAccept(proposalId)}
+              onReject={(proposalId) => void handleProposalReject(proposalId)}
+              onStartProject={(proposalId) => void transitionProposalProject(proposalId, 'start')}
+              onCompleteProject={(proposalId) => void transitionProposalProject(proposalId, 'complete')}
+              onWriteReview={(projectId, projectTitle) => openFreelancerReviewModal(projectId, projectTitle)}
+              onViewProject={(proposalId) => void openFreelancerProjectDetail(proposalId)}
+            />
+            </section>
+          </>
         ) : (
           <div className="project-empty">
             <p>관리자 프로젝트 관리 화면은 마이페이지에서 확인해 주세요.</p>
@@ -606,7 +849,7 @@ export default function ProjectPage3() {
                             <div className="proposal-card-meta">
                               <span className="project-type-badge">{proposal.freelancer.name}</span>
                               <span className={`project-status ${STATUS_COLOR[selectedProject.status]}`}>
-                                {proposal.status}
+                                {proposalStatusLabel(proposal.status)}
                               </span>
                             </div>
                             <span className="proposal-card-date">{formatDateTime(proposal.createdAt)}</span>
@@ -621,7 +864,7 @@ export default function ProjectPage3() {
                 )}
 
                 <div className="modal-actions">
-                  {selectedProject.status === 'REQUESTED' && (
+                  {isUser && selectedProject.status === 'REQUESTED' && (
                     <>
                       <button
                         type="button"
@@ -641,7 +884,7 @@ export default function ProjectPage3() {
                       </button>
                     </>
                   )}
-                  {selectedProject.status === 'COMPLETED' && (
+                  {isUser && selectedProject.status === 'COMPLETED' && (
                     <button
                       type="button"
                       className="btn-action btn-review"
@@ -700,6 +943,55 @@ export default function ProjectPage3() {
           }))}
           onContentChange={(content) => setReviewForm((prev) => ({ ...prev, content }))}
         />
+      )}
+
+      {selectedFreelancerProject && (
+        <div className="modal-overlay" onClick={closeFreelancerProjectDetail}>
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <button type="button" className="modal-close" onClick={closeFreelancerProjectDetail}>닫기</button>
+
+            {freelancerProjectLoading ? (
+              <p>상세 정보를 불러오는 중입니다.</p>
+            ) : (
+              <>
+                <div className="modal-head">
+                  <div className="modal-badges">
+                    <span className="project-type-badge">프리랜서 프로젝트</span>
+                    <span className={`project-status ${STATUS_COLOR[selectedFreelancerProject.projectStatus]}`}>
+                      {PROJECT_STATUS_LABEL[selectedFreelancerProject.projectStatus]}
+                    </span>
+                  </div>
+                  <h2 className="modal-title">{selectedFreelancerProject.projectTitle}</h2>
+                </div>
+
+                <ul className="modal-info">
+                  <li><span>제안 상태</span><span>{PROPOSAL_STATUS_LABEL[selectedFreelancerProject.proposalStatus]}</span></li>
+                  <li><span>프로젝트 상태</span><span>{PROJECT_STATUS_LABEL[selectedFreelancerProject.projectStatus]}</span></li>
+                  <li><span>시작</span><span>{formatDateTime(selectedFreelancerProject.requestedStartAt)}</span></li>
+                  <li><span>종료</span><span>{formatDateTime(selectedFreelancerProject.requestedEndAt)}</span></li>
+                  <li><span>지역</span><span>{labelOf(regionMap, selectedFreelancerProject.serviceRegionCode)}</span></li>
+                  <li><span>주소</span><span>{selectedFreelancerProject.serviceAddress}</span></li>
+                  <li><span>상세 주소</span><span>{selectedFreelancerProject.serviceDetailAddress || '-'}</span></li>
+                  <li><span>수락 시각</span><span>{formatDateTime(selectedFreelancerProject.projectAcceptedAt)}</span></li>
+                </ul>
+
+                <div className="modal-desc">
+                  <p className="modal-desc-label">요청 상세</p>
+                  <p className="modal-desc-text">{selectedFreelancerProject.requestDetail}</p>
+                </div>
+
+                {selectedFreelancerProject.message && (
+                  <div className="modal-desc">
+                    <p className="modal-desc-label">내 제안 메모</p>
+                    <p className="modal-desc-text">{selectedFreelancerProject.message}</p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {freelancerProjectError && <p className="login-error">{freelancerProjectError}</p>}
+          </div>
+        </div>
       )}
     </div>
   );
