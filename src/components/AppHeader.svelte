@@ -43,6 +43,40 @@
     return NOTIFICATION_TEXT_MAP.reduce((text, [pattern, replacement]) => text.replace(pattern, replacement), value);
   }
 
+  const REVIEW_REPORT_REASON_LABELS: Record<string, string> = {
+    SPAM: '스팸/홍보',
+    ABUSE: '욕설/비방',
+    FALSE_INFO: '허위 정보',
+    ETC: '기타',
+  };
+
+  function getReviewReportedText(notification: NotificationSummaryResponse): { title: string; content: string } {
+    const reviewIdMatch = notification.content.match(/Review #(\d+)/i);
+    const projectTitleMatch = notification.content.match(/on project "([^"]+)"/i);
+    const reasonTypeMatch = notification.content.match(/reported for ([A-Z_]+)/i);
+    const reviewId = notification.relatedReviewId ?? (reviewIdMatch ? Number(reviewIdMatch[1]) : null);
+    const projectTitle = projectTitleMatch?.[1]?.trim();
+    const reasonLabel = reasonTypeMatch ? REVIEW_REPORT_REASON_LABELS[reasonTypeMatch[1]] : undefined;
+    const reviewTarget = `${projectTitle ? `${projectTitle} 프로젝트의 ` : ''}리뷰${reviewId ? ` ${reviewId}번` : ''}`;
+    const reasonText = reasonLabel ? ` 신고 사유: ${reasonLabel}.` : '';
+
+    return {
+      title: '리뷰 신고가 접수되었습니다.',
+      content: `${reviewTarget}이 신고되었습니다.${reasonText} 관리자 신고 처리 화면에서 확인해 주세요.`,
+    };
+  }
+
+  function getNotificationDisplayText(notification: NotificationSummaryResponse): { title: string; content: string } {
+    if (notification.notificationType === 'REVIEW_REPORTED') {
+      return getReviewReportedText(notification);
+    }
+
+    return {
+      title: translateNotificationText(notification.title),
+      content: translateNotificationText(notification.content),
+    };
+  }
+
   function getNotificationLink(notification: NotificationSummaryResponse): string | null {
     switch (notification.notificationType) {
       case 'NOTICE':
@@ -50,6 +84,10 @@
       case 'VERIFICATION_APPROVED':
       case 'VERIFICATION_REJECTED':
         return '/mypage?tab=certify';
+      case 'REVIEW_REPORTED':
+        return notification.relatedReviewId
+          ? `/mypage?tab=reports&reviewId=${notification.relatedReviewId}`
+          : '/mypage?tab=reports';
       case 'PROPOSAL_RECEIVED':
       case 'PROPOSAL_ACCEPTED':
         return notification.relatedProjectId ? `/project?projectId=${notification.relatedProjectId}` : '/project';
@@ -90,7 +128,7 @@
     try {
       const response = await getNotifications({ page: 0, size: 20 });
       notifications = response.content.filter(isNoticeVisibleToRole);
-      unreadCount = notifications.filter((n) => !n.isRead).length;
+      unreadCount = response.unreadCount;
     } catch {
       notifications = [];
       unreadCount = 0;
@@ -258,10 +296,10 @@
                     onclick={() => handleNotificationSelect(notification)}
                   >
                     <div class="header-notification-top">
-                      <strong>{translateNotificationText(notification.title)}</strong>
+                      <strong>{getNotificationDisplayText(notification).title}</strong>
                       <span>{formatNotificationTime(notification.createdAt)}</span>
                     </div>
-                    <p class="header-notification-message">{translateNotificationText(notification.content)}</p>
+                    <p class="header-notification-message">{getNotificationDisplayText(notification).content}</p>
                     <span class="header-notification-meta">{getNotificationMeta(notification)}</span>
                   </button>
                 {/each}

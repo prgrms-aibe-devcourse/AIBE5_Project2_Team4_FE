@@ -128,6 +128,16 @@ function toProjectRequest(form: ProjectFormValues): ProjectCreateRequest {
   };
 }
 
+function readProjectIdFromSearch(search: string): number | null {
+  const raw = new URLSearchParams(search).get('projectId');
+  if (!raw) {
+    return null;
+  }
+
+  const projectId = Number(raw);
+  return Number.isFinite(projectId) && projectId > 0 ? projectId : null;
+}
+
 function mergeProposalDetail(
   proposal: ProposalSummaryResponse,
   detail: ProposalDetailResponse,
@@ -183,7 +193,9 @@ export default function ProjectPage3() {
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
   const [projectDetailLoading, setProjectDetailLoading] = useState(false);
   const [mutationLoading, setMutationLoading] = useState(false);
-  const autoOpenedOwnProjectRef = useRef(false);
+  const [locationSearch, setLocationSearch] = useState(() => window.location.search);
+  const deepLinkedProjectIdRef = useRef<number | null>(null);
+  const selectedProjectId = selectedProject?.projectId ?? null;
 
   const filteredProjects = useMemo(
     () => statusFilter === 'ALL' ? projects : projects.filter((project) => project.status === statusFilter),
@@ -222,6 +234,12 @@ export default function ProjectPage3() {
     }
 
     setUser(nextUser);
+  }, []);
+
+  useEffect(() => {
+    const syncLocationSearch = () => setLocationSearch(window.location.search);
+    window.addEventListener('popstate', syncLocationSearch);
+    return () => window.removeEventListener('popstate', syncLocationSearch);
   }, []);
 
   useEffect(() => {
@@ -366,44 +384,55 @@ export default function ProjectPage3() {
     }
   }, [projectMode]);
 
+  function clearProjectIdFromUrl() {
+    const url = new URL(window.location.href);
+    if (!url.searchParams.has('projectId')) {
+      return;
+    }
+
+    url.searchParams.delete('projectId');
+    window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+    setLocationSearch(url.search);
+  }
+
+  function closeSelectedProject() {
+    setSelectedProject(null);
+    setSelectedProjectProposals([]);
+    deepLinkedProjectIdRef.current = null;
+    clearProjectIdFromUrl();
+  }
+
   useEffect(() => {
     if (loading || projectMode !== 'user') {
       return;
     }
 
-    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'));
-    if (!Number.isFinite(projectId) || projectId <= 0) {
+    const projectId = readProjectIdFromSearch(locationSearch);
+    if (projectId == null) {
+      if (deepLinkedProjectIdRef.current != null
+          && selectedProjectId === deepLinkedProjectIdRef.current) {
+        setSelectedProject(null);
+        setSelectedProjectProposals([]);
+      }
+      deepLinkedProjectIdRef.current = null;
       return;
     }
 
-    if (selectedProject?.projectId === projectId) {
+    if (selectedProjectId == null && deepLinkedProjectIdRef.current === projectId) {
+      setSelectedProjectProposals([]);
+      deepLinkedProjectIdRef.current = null;
+      clearProjectIdFromUrl();
+      return;
+    }
+
+    deepLinkedProjectIdRef.current = projectId;
+
+    if (selectedProjectId === projectId) {
       return;
     }
 
     void openProjectDetail(projectId);
-  }, [loading, openProjectDetail, projectMode, selectedProject?.projectId]);
-
-  useEffect(() => {
-    if (loading || projectMode !== 'user') {
-      return;
-    }
-
-    if (autoOpenedOwnProjectRef.current) {
-      return;
-    }
-
-    if (selectedProject || projects.length === 0) {
-      return;
-    }
-
-    const projectId = Number(new URLSearchParams(window.location.search).get('projectId'));
-    if (Number.isFinite(projectId) && projectId > 0) {
-      return;
-    }
-
-    autoOpenedOwnProjectRef.current = true;
-    void openProjectDetail(projects[0].projectId);
-  }, [loading, openProjectDetail, projectMode, projects, selectedProject]);
+  }, [loading, locationSearch, openProjectDetail, projectMode, selectedProjectId]);
 
   async function handleCreate(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -464,8 +493,7 @@ export default function ProjectPage3() {
     try {
       await cancelProject(projectId, reason.trim());
       await refreshUserProjects();
-      setSelectedProject(null);
-      setSelectedProjectProposals([]);
+      closeSelectedProject();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '프로젝트 취소에 실패했습니다.'));
     } finally {
@@ -525,6 +553,21 @@ export default function ProjectPage3() {
     setShowReviewModal(true);
   }
 
+  function closeReviewModal() {
+    const shouldCloseDeepLinkedProject = projectMode === 'user'
+      && readProjectIdFromSearch(locationSearch) != null;
+
+    setShowReviewModal(false);
+    setSelectedReview(null);
+    setReviewingProjectId(null);
+    setReviewingProjectTitle('');
+    setReviewForm(EMPTY_REVIEW_FORM);
+
+    if (shouldCloseDeepLinkedProject) {
+      closeSelectedProject();
+    }
+  }
+
   async function handleReviewSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
 
@@ -541,11 +584,7 @@ export default function ProjectPage3() {
       }
 
       await refreshMyReviews();
-      setShowReviewModal(false);
-      setSelectedReview(null);
-      setReviewingProjectId(null);
-      setReviewingProjectTitle('');
-      setReviewForm(EMPTY_REVIEW_FORM);
+      closeReviewModal();
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '리뷰 저장에 실패했습니다.'));
     } finally {
@@ -802,9 +841,9 @@ export default function ProjectPage3() {
       </main>
 
       {selectedProject && (
-        <div className="modal-overlay" onClick={() => setSelectedProject(null)}>
+        <div className="modal-overlay" onClick={closeSelectedProject}>
           <div className="modal" onClick={(event) => event.stopPropagation()}>
-            <button type="button" className="modal-close" onClick={() => setSelectedProject(null)}>닫기</button>
+            <button type="button" className="modal-close" onClick={closeSelectedProject}>닫기</button>
 
             {projectDetailLoading ? (
               <p>상세 정보를 불러오는 중입니다.</p>
@@ -930,7 +969,7 @@ export default function ProjectPage3() {
           selectedReview={selectedReview}
           reviewForm={reviewForm}
           reviewTags={reviewTagOptions}
-          onClose={() => { setShowReviewModal(false); setReviewingProjectId(null); setReviewingProjectTitle(''); }}
+          onClose={closeReviewModal}
           onSubmit={handleReviewSubmit}
           onRatingChange={(rating) => setReviewForm((prev) => ({ ...prev, rating }))}
           onTagToggle={(tagCode) => setReviewForm((prev) => ({

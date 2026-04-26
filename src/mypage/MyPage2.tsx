@@ -94,6 +94,16 @@ import {
   type Tab,
 } from './myPageShared';
 
+function readRequestedReviewId(): number | null {
+  const raw = new URLSearchParams(window.location.search).get('reviewId');
+  if (!raw) {
+    return null;
+  }
+
+  const value = Number(raw);
+  return Number.isFinite(value) && value > 0 ? value : null;
+}
+
 export default function MyPage2() {
   const [user, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('account');
@@ -963,6 +973,42 @@ export default function MyPage2() {
       setSaving(false);
     }
   }
+
+  useEffect(() => {
+    if (user?.role !== 'ROLE_ADMIN' || activeTab !== 'reports') {
+      return;
+    }
+
+    const requestedReviewId = readRequestedReviewId();
+    if (requestedReviewId == null || adminReports.length === 0) {
+      return;
+    }
+
+    const matchingReport = adminReports.find((report) => report.reviewId === requestedReviewId);
+    if (!matchingReport || selectedAdminReport?.reportId === matchingReport.reportId) {
+      return;
+    }
+
+    const reportId = matchingReport.reportId;
+    let cancelled = false;
+    async function selectRequestedReport() {
+      try {
+        const detail = await getAdminReport(reportId);
+        if (!cancelled) {
+          setSelectedAdminReport(detail);
+        }
+      } catch (caughtError) {
+        if (!cancelled) {
+          setError(getErrorMessage(caughtError, '신고 상세를 불러오지 못했습니다.'));
+        }
+      }
+    }
+
+    void selectRequestedReport();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, adminReports, selectedAdminReport?.reportId, user?.role]);
 
   if (!user || loading) {
     return (

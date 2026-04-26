@@ -21,6 +21,7 @@ export type NotificationType =
   | 'PROJECT_STATUS'
   | 'PROPOSAL_RECEIVED'
   | 'PROPOSAL_ACCEPTED'
+  | 'REVIEW_REPORTED'
   | 'FREELANCER_STATUS'
   | 'ANNOUNCEMENT';
 
