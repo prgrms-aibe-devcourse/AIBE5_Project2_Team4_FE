@@ -1331,6 +1331,25 @@ export default function MyPage2() {
                   <li><span>가능 시간대</span><span>{selectedAdminFreelancer.availableTimeSlotCodes.map((code) => labelOf(timeSlotMap, code)).join(', ') || '-'}</span></li>
                   <li><span>서비스 유형</span><span>{selectedAdminFreelancer.projectTypeCodes.map((code) => labelOf(projectTypeMap, code)).join(', ') || '-'}</span></li>
                 </ul>
+                <p className="admin-subtext">첨부 파일</p>
+                {selectedAdminFreelancer.portfolioFiles.length === 0 ? (
+                  <p className="empty-msg">등록된 첨부 파일이 없습니다.</p>
+                ) : (
+                  <ul className="admin-list">
+                    {selectedAdminFreelancer.portfolioFiles.map((file) => (
+                      <li key={file.fileId} className="admin-item">
+                        <div>
+                          <strong>{file.originalName}</strong>
+                          <p className="admin-subtext">{formatDateTime(file.uploadedAt)}</p>
+                        </div>
+                        <div className="admin-item-right">
+                          <button type="button" className="btn-edit" onClick={() => void handleFileView(file.viewUrl)}>보기</button>
+                          <button type="button" className="btn-edit" onClick={() => void handleFileDownload(file.downloadUrl)}>다운로드</button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             )}
           </div>

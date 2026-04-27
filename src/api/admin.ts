@@ -175,7 +175,7 @@ export interface AdminFreelancerDetailResponse {
     rejectReason?: string | null;
   }>;
   portfolioFiles: Array<{
-    verificationFileId: number;
+    fileId: number;
     originalName: string;
     contentType?: string | null;
     fileSize?: number | null;
