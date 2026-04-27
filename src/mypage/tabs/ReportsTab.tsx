@@ -19,6 +19,7 @@ type Props =
       selectedReport: AdminReportDetailResponse | null;
       onBlindToggle: (reviewId: number, blindedYn: boolean) => void;
       onSelectReport: (reportId: number) => void;
+      onCloseReport: () => void;
       onResolveReport: (reportId: number) => void;
       onRejectReport: (reportId: number) => void;
     };
@@ -116,25 +117,49 @@ export default function ReportsTab(props: Props) {
             </ul>
           )}
 
-          {props.selectedReport && (
-            <div className="account-card" style={{ marginTop: '1rem' }}>
-              <h4>선택한 신고 #{props.selectedReport.reportId}</h4>
-              <p className="admin-subtext">사유: {reportReasonLabel(props.selectedReport.reasonType)}</p>
-              {props.selectedReport.reasonDetail && (
-                <p className="review-content">{props.selectedReport.reasonDetail}</p>
-              )}
-              <ul className="account-info-list">
-                <li><span>상태</span><span>{reportStatusLabel(props.selectedReport.status)}</span></li>
-                <li><span>신고자</span><span>{props.selectedReport.reporter.name}</span></li>
-                <li><span>대상 리뷰</span><span>{props.selectedReport.review.projectTitle}</span></li>
-                <li><span>블라인드</span><span>{props.selectedReport.review.blindedYn ? '예' : '아니오'}</span></li>
-                <li><span>작성자</span><span>{props.selectedReport.review.writer.name}</span></li>
-                <li><span>대상 프리랜서</span><span>{props.selectedReport.review.targetFreelancer.name}</span></li>
-              </ul>
-            </div>
-          )}
         </section>
       </div>
+
+      {props.selectedReport && (
+        <div className="mp-modal-overlay" onClick={props.onCloseReport}>
+          <div className="mp-modal" onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="mp-modal-close" onClick={props.onCloseReport}>✕</button>
+            <div className="mp-modal-head">
+              <h2 className="mp-modal-title">신고 #{props.selectedReport.reportId} 상세</h2>
+              <p className="admin-subtext">사유: {reportReasonLabel(props.selectedReport.reasonType)}</p>
+            </div>
+            {props.selectedReport.reasonDetail && (
+              <p className="review-content">{props.selectedReport.reasonDetail}</p>
+            )}
+            <ul className="mp-modal-info">
+              <li><span>상태</span><span>{reportStatusLabel(props.selectedReport.status)}</span></li>
+              <li><span>신고자</span><span>{props.selectedReport.reporter.name}</span></li>
+              <li><span>대상 리뷰</span><span>{props.selectedReport.review.projectTitle}</span></li>
+              <li><span>블라인드</span><span>{props.selectedReport.review.blindedYn ? '예' : '아니오'}</span></li>
+              <li><span>작성자</span><span>{props.selectedReport.review.writer.name}</span></li>
+              <li><span>대상 프리랜서</span><span>{props.selectedReport.review.targetFreelancer.name}</span></li>
+            </ul>
+            {props.selectedReport.status === 'PENDING' && (
+              <div className="mp-modal-actions">
+                <button
+                  className="btn-edit"
+                  style={{ flex: 1 }}
+                  onClick={() => props.onResolveReport(props.selectedReport!.reportId)}
+                >
+                  승인
+                </button>
+                <button
+                  className="btn-cancel"
+                  style={{ flex: 1 }}
+                  onClick={() => props.onRejectReport(props.selectedReport!.reportId)}
+                >
+                  반려
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

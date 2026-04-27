@@ -1388,6 +1388,7 @@ export default function MyPage2() {
               selectedReport={selectedAdminReport}
               onBlindToggle={(reviewId, blindedYn) => void handleAdminBlindToggle(reviewId, blindedYn)}
               onSelectReport={(reportId) => void handleSelectAdminReport(reportId)}
+              onCloseReport={() => setSelectedAdminReport(null)}
               onResolveReport={(reportId) => void handleResolveAdminReport(reportId)}
               onRejectReport={(reportId) => void handleRejectAdminReport(reportId)}
             />
