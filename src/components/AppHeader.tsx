@@ -48,6 +48,7 @@ const NOTIFICATION_TEXT_MAP: Array<[RegExp, string]> = [
   [/\bCANCELLED\b/gi, '취소됨'],
   [/\bREJECTED\b/gi, '거절됨'],
   [/\bPENDING\b/gi, '대기 중'],
+  [/\bRESOLVED\b/gi, '처리됨'],
 ];
 
 function translateNotificationText(value: string): string {

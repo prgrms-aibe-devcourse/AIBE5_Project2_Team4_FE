@@ -247,7 +247,14 @@ export default function MyPage2() {
         return;
       }
 
-      setActiveTab(resolveRequestedTab(nextUser));
+      const tab = resolveRequestedTab(nextUser);
+      setActiveTab(tab);
+
+      if (tab === 'reports' && (nextUser.role === 'ROLE_USER' || nextUser.role === 'ROLE_FREELANCER')) {
+        void getMyReports({ page: 0, size: 100 }).then((reportPage) => {
+          setReports(reportPage.content);
+        });
+      }
     };
 
     window.addEventListener('popstate', syncRequestedTab);
@@ -397,6 +404,12 @@ export default function MyPage2() {
   function handleTabChange(tab: Tab) {
     setActiveTab(tab);
     updateTabQuery(tab);
+
+    if (tab === 'reports' && (user?.role === 'ROLE_USER' || user?.role === 'ROLE_FREELANCER')) {
+      void getMyReports({ page: 0, size: 100 }).then((reportPage) => {
+        setReports(reportPage.content);
+      });
+    }
   }
 
   function startEditReview(review: ReviewSummaryResponse) {

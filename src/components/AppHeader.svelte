@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
   import { onMount } from 'svelte';
   import './appHeader.css';
   import { AUTH_USER_EVENT, getUser, logout, type User } from '../store/appAuth';
@@ -38,6 +38,7 @@
     [/\bCANCELLED\b/gi, '취소됨'],
     [/\bREJECTED\b/gi, '거절됨'],
     [/\bPENDING\b/gi, '대기 중'],
+    [/\bRESOLVED\b/gi, '처리됨'],
   ];
 
   function translateNotificationText(value: string): string {
@@ -303,10 +304,10 @@
                       onclick={() => handleNotificationSelect(notification)}
                     >
                       <div class="header-notification-top">
-                        <strong>{translateNotificationText(notification.title)}</strong>
+                        <strong>{getNotificationDisplayText(notification).title}</strong>
                         <span>{formatNotificationTime(notification.createdAt)}</span>
                       </div>
-                      <p class="header-notification-message">{translateNotificationText(notification.content)}</p>
+                      <p class="header-notification-message">{getNotificationDisplayText(notification).content}</p>
                       <span class="header-notification-meta">{getNotificationMeta(notification)}</span>
                     </button>
                     <button
@@ -321,18 +322,6 @@
                       ×
                     </button>
                   </div>
-                  <button
-                    type="button"
-                    class={`header-notification-item${notification.isRead ? '' : ' unread'}`}
-                    onclick={() => handleNotificationSelect(notification)}
-                  >
-                    <div class="header-notification-top">
-                      <strong>{getNotificationDisplayText(notification).title}</strong>
-                      <span>{formatNotificationTime(notification.createdAt)}</span>
-                    </div>
-                    <p class="header-notification-message">{getNotificationDisplayText(notification).content}</p>
-                    <span class="header-notification-meta">{getNotificationMeta(notification)}</span>
-                  </button>
                 {/each}
               </div>
             {/if}
@@ -378,3 +367,4 @@
     {/if}
   </div>
 </nav>
+
