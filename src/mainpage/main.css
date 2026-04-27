@@ -104,8 +104,8 @@
   position: absolute;
   right: 2rem;
   top: 50%;
-  width: 35vw;
-  transform: translateX(85px) translateY(-50%);
+  width: clamp(300px, 40vw, 640px);
+  transform: translateX(75px) translateY(-50%);
   display: flex;
   justify-content: center;
   align-items: center;
