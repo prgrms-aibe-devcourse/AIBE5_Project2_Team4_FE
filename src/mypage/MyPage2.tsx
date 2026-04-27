@@ -104,6 +104,16 @@ function readRequestedReviewId(): number | null {
   return Number.isFinite(value) && value > 0 ? value : null;
 }
 
+function clearRequestedReviewId(): void {
+  const url = new URL(window.location.href);
+  if (!url.searchParams.has('reviewId')) {
+    return;
+  }
+
+  url.searchParams.delete('reviewId');
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
 export default function MyPage2() {
   const [user, setCurrentUser] = useState<User | null>(null);
   const [activeTab, setActiveTab] = useState<Tab>('account');
@@ -922,10 +932,11 @@ export default function MyPage2() {
 
   async function handleSelectAdminReport(reportId: number) {
     if (selectedAdminReport?.reportId === reportId) {
-      setSelectedAdminReport(null);
+      handleCloseAdminReport();
       return;
     }
 
+    clearRequestedReviewId();
     setSaving(true);
     setError('');
 
@@ -939,6 +950,11 @@ export default function MyPage2() {
     }
   }
 
+  function handleCloseAdminReport() {
+    clearRequestedReviewId();
+    setSelectedAdminReport(null);
+  }
+
   async function handleResolveAdminReport(reportId: number) {
     setSaving(true);
     setError('');
@@ -946,7 +962,7 @@ export default function MyPage2() {
     try {
       await resolveAdminReport(reportId);
       await refreshAdminData();
-      setSelectedAdminReport(null);
+      handleCloseAdminReport();
       setNotice('신고를 승인 처리했습니다.');
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '신고 승인 처리에 실패했습니다.'));
@@ -962,7 +978,7 @@ export default function MyPage2() {
     try {
       await rejectAdminReport(reportId);
       await refreshAdminData();
-      setSelectedAdminReport(null);
+      handleCloseAdminReport();
       setNotice('신고를 반려 처리했습니다.');
     } catch (caughtError) {
       setError(getErrorMessage(caughtError, '신고 반려 처리에 실패했습니다.'));
@@ -1388,7 +1404,7 @@ export default function MyPage2() {
               selectedReport={selectedAdminReport}
               onBlindToggle={(reviewId, blindedYn) => void handleAdminBlindToggle(reviewId, blindedYn)}
               onSelectReport={(reportId) => void handleSelectAdminReport(reportId)}
-              onCloseReport={() => setSelectedAdminReport(null)}
+              onCloseReport={handleCloseAdminReport}
               onResolveReport={(reportId) => void handleResolveAdminReport(reportId)}
               onRejectReport={(reportId) => void handleRejectAdminReport(reportId)}
             />

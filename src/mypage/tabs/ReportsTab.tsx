@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import type {
   AdminReportDetailResponse,
   AdminReportListItemResponse,
@@ -6,6 +7,8 @@ import type {
 import type { ReportSummaryResponse } from '../../api/reports';
 import { formatDateTime } from '../../lib/referenceData';
 import { reportReasonLabel, reportStatusLabel } from '../../lib/koreanLabels';
+
+type AdminReportView = 'reviews' | 'reports';
 
 type Props =
   | {
@@ -25,6 +28,10 @@ type Props =
     };
 
 export default function ReportsTab(props: Props) {
+  const [adminReportView, setAdminReportView] = useState<AdminReportView>('reviews');
+  const selectedAdminReportId = props.mode === 'admin' ? props.selectedReport?.reportId : null;
+  const visibleAdminReportView: AdminReportView = selectedAdminReportId != null ? 'reports' : adminReportView;
+
   if (props.mode === 'user') {
     return (
       <div className="tab-content">
@@ -57,67 +64,86 @@ export default function ReportsTab(props: Props) {
 
   return (
     <div className="tab-content">
+      <div className="verify-toolbar">
+        <button
+          type="button"
+          className={`filter-btn filter-btn--all${visibleAdminReportView === 'reviews' ? ' active' : ''}`}
+          onClick={() => {
+            props.onCloseReport();
+            setAdminReportView('reviews');
+          }}
+        >
+          리뷰 노출 관리 {props.reviews.length}
+        </button>
+        <button
+          type="button"
+          className={`filter-btn filter-btn--all${visibleAdminReportView === 'reports' ? ' active' : ''}`}
+          onClick={() => setAdminReportView('reports')}
+        >
+          신고 처리 {props.reports.length}
+        </button>
+      </div>
+
       <div className="report-admin-grid">
-        <section className="report-admin-section">
-          <h3 className="report-section-title">리뷰 노출 관리</h3>
-          {props.reviews.length === 0 ? (
-            <p className="empty-msg">관리 대상 리뷰가 없습니다.</p>
-          ) : (
-            <ul className="review-list">
-              {props.reviews.map((review) => (
-                <li key={review.reviewId} className="review-item">
-                  <div className="review-header">
-                    <div>
-                      <span className="review-service">{review.projectTitle}</span>
-                      <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+        {visibleAdminReportView === 'reviews' ? (
+          <section className="report-admin-section">
+            {props.reviews.length === 0 ? (
+              <p className="empty-msg">관리 대상 리뷰가 없습니다.</p>
+            ) : (
+              <ul className="review-list">
+                {props.reviews.map((review) => (
+                  <li key={review.reviewId} className="review-item">
+                    <div className="review-header">
+                      <div>
+                        <span className="review-service">{review.projectTitle}</span>
+                        <div className="review-stars">{'★'.repeat(review.rating)}{'☆'.repeat(5 - review.rating)}</div>
+                      </div>
+                      <span className="review-date">{formatDateTime(review.createdAt)}</span>
                     </div>
-                    <span className="review-date">{formatDateTime(review.createdAt)}</span>
-                  </div>
-                  <p className="admin-subtext">
-                    작성자 {review.writer.name} / 대상 {review.targetFreelancer.name}
-                  </p>
-                  <div className="review-actions-row">
-                    <span className="review-state-text">{review.blindedYn ? '블라인드됨' : '노출 중'}</span>
-                    <button
-                      className="btn-edit"
-                      onClick={() => props.onBlindToggle(review.reviewId, review.blindedYn)}
-                    >
-                      {review.blindedYn ? '블라인드 해제' : '블라인드'}
-                    </button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-
-        <section className="report-admin-section">
-          <h3 className="report-section-title">신고 처리</h3>
-          {props.reports.length === 0 ? (
-            <p className="empty-msg">처리할 신고가 없습니다.</p>
-          ) : (
-            <ul className="review-list">
-              {props.reports.map((report) => (
-                <li key={report.reportId} className="review-item">
-                  <div className="review-header">
-                    <div>
-                      <span className="review-service">{reportReasonLabel(report.reasonType)}</span>
-                      <div className="admin-subtext">신고자 {report.reporter.name}</div>
+                    <p className="admin-subtext">
+                      작성자 {review.writer.name} / 대상 {review.targetFreelancer.name}
+                    </p>
+                    <div className="review-actions-row">
+                      <span className="review-state-text">{review.blindedYn ? '블라인드됨' : '노출 중'}</span>
+                      <button
+                        className="btn-edit"
+                        onClick={() => props.onBlindToggle(review.reviewId, review.blindedYn)}
+                      >
+                        {review.blindedYn ? '블라인드 해제' : '블라인드'}
+                      </button>
                     </div>
-                    <span className="review-date">{formatDateTime(report.createdAt)}</span>
-                  </div>
-                  <div className="review-actions-row">
-                    <span className="review-state-text">상태: {reportStatusLabel(report.status)}</span>
-                    <button className="btn-edit" onClick={() => props.onSelectReport(report.reportId)}>상세</button>
-                    <button className="btn-edit" onClick={() => props.onResolveReport(report.reportId)}>승인</button>
-                    <button className="btn-cancel" onClick={() => props.onRejectReport(report.reportId)}>반려</button>
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-
-        </section>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        ) : (
+          <section className="report-admin-section">
+            {props.reports.length === 0 ? (
+              <p className="empty-msg">처리할 신고가 없습니다.</p>
+            ) : (
+              <ul className="review-list">
+                {props.reports.map((report) => (
+                  <li key={report.reportId} className="review-item">
+                    <div className="review-header">
+                      <div>
+                        <span className="review-service">{reportReasonLabel(report.reasonType)}</span>
+                        <div className="admin-subtext">신고자 {report.reporter.name}</div>
+                      </div>
+                      <span className="review-date">{formatDateTime(report.createdAt)}</span>
+                    </div>
+                    <div className="review-actions-row">
+                      <span className="review-state-text">상태: {reportStatusLabel(report.status)}</span>
+                      <button className="btn-edit" onClick={() => props.onSelectReport(report.reportId)}>상세</button>
+                      <button className="btn-edit" onClick={() => props.onResolveReport(report.reportId)}>승인</button>
+                      <button className="btn-cancel" onClick={() => props.onRejectReport(report.reportId)}>반려</button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        )}
       </div>
 
       {props.selectedReport && (
