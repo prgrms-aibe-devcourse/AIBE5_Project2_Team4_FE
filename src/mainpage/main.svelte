@@ -3,17 +3,65 @@
   import './main.css';
   import AppHeader from '../components/AppHeader.svelte';
 
-  let video: HTMLVideoElement;
+  let canvas: HTMLCanvasElement;
   let rafId: number;
+  let frames: ImageBitmap[] = [];
+  let loadProgress = 0;
   let contactSubmitted = false;
   let contactError = '';
 
   function handleMouseMove(e: MouseEvent) {
-    if (!video?.duration) return;
+    if (frames.length === 0) return;
     cancelAnimationFrame(rafId);
     rafId = requestAnimationFrame(() => {
-      video.currentTime = (e.clientX / window.innerWidth) * video.duration;
+      const idx = Math.min(
+        Math.floor((e.clientX / window.innerWidth) * frames.length),
+        frames.length - 1
+      );
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(frames[idx], 0, 0, canvas.width, canvas.height);
     });
+  }
+
+  async function preloadFrames() {
+    const vid = document.createElement('video');
+    vid.src = '/stella-main.webm';
+    vid.muted = true;
+    vid.preload = 'auto';
+    vid.playsInline = true;
+
+    await new Promise<void>((resolve) => {
+      vid.addEventListener('loadedmetadata', () => resolve(), { once: true });
+      vid.load();
+    });
+
+    const fps = 24;
+    const total = Math.round(vid.duration * fps);
+
+    for (let i = 0; i < total; i++) {
+      vid.currentTime = i / fps;
+      await new Promise<void>((resolve) => {
+        vid.addEventListener('seeked', () => resolve(), { once: true });
+      });
+      const bitmap = await createImageBitmap(vid, {
+        resizeWidth: 540,
+        resizeHeight: 960,
+        resizeQuality: 'high',
+      });
+      frames.push(bitmap);
+      loadProgress = Math.round(((i + 1) / total) * 100);
+    }
+
+    // 첫 프레임 표시
+    if (canvas && frames.length > 0) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.drawImage(frames[0], 0, 0, canvas.width, canvas.height);
+      }
+    }
   }
 
   function handleContactSubmit(e: SubmitEvent) {
@@ -49,6 +97,8 @@
       if (el) el.scrollIntoView({ behavior: 'smooth' });
     }
 
+    void preloadFrames();
+
     const chatRoot = document.createElement('div');
     document.body.appendChild(chatRoot);
     const { createRoot, createElement } = await Promise.all([
@@ -83,9 +133,12 @@
 
     <div class="character-container">
       <div class="character-placeholder">
-        <video bind:this={video} muted preload="auto" playsinline class="character-video">
-          <source src="/stella-main.webm" type="video/webm" />
-        </video>
+        <canvas bind:this={canvas} width="540" height="960" class="character-video"></canvas>
+        {#if loadProgress < 100}
+          <div class="character-loading">
+            <div class="character-loading-bar" style="width: {loadProgress}%"></div>
+          </div>
+        {/if}
       </div>
     </div>
   </section>
