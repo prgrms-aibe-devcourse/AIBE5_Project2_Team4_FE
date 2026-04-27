@@ -105,7 +105,7 @@
   right: 2rem;
   top: 50%;
   width: 25vw;
-  transform: translateX(75px) translateY(-48%);
+  transform: translateX(75px) translateY(-50%);
   display: flex;
   justify-content: center;
   align-items: center;
