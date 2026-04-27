@@ -56,7 +56,7 @@ export default function FreelancerPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [projectTypeOptions, setProjectTypeOptions] = useState<Array<{ code: string; name: string }>>([]);
   const [regionFilterOptions, setRegionFilterOptions] = useState<CodeLookupResponse[]>([]);
-  const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
+const [projectTypeMap, setProjectTypeMap] = useState<Map<string, string>>(new Map());
   const [regionMap, setRegionMap] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function FreelancerPage() {
         setProjectTypeMap(new Map(projectTypes.map((item) => [item.code, item.name])));
         setRegionMap(new Map(regions.map((item) => [item.code, item.name])));
 
-        const sidoOptions = sortSido(regions.filter((r) => r.regionLevel === 1));
+        const sidoOptions = sortSido(regions.filter((r) => r.regionLevel === 1 && r.code !== 'SEOUL_GANGNAM'));
         setRegionFilterOptions(sidoOptions);
       } catch (caughtError) {
         setError(getErrorMessage(caughtError, '프리랜서 기준 코드를 불러오지 못했습니다.'));
@@ -255,7 +255,7 @@ export default function FreelancerPage() {
                 </div>
                 <p className="fl-bio">{freelancer.intro || '등록된 소개가 없습니다.'}</p>
                 <div className="fl-stats">
-                  <span>지역 {freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)).join(', ') || '-'}</span>
+                  <span>지역 {freelancer.activityRegionCodes.filter((code) => code !== 'SEOUL_GANGNAM').map((code) => labelOf(regionMap, code)).join(', ') || '-'}</span>
                   <span>활동 {freelancer.activityCount ?? 0}건</span>
                   <span>{freelancer.caregiverYn ? '요양보호사 보유' : '일반 프로필'}</span>
                 </div>

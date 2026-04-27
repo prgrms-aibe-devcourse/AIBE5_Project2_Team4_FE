@@ -268,7 +268,7 @@ export default function FreelancerDetailPage2() {
 
             <ul className="fd-meta-list">
               <li><span className="fd-meta-icon">🕒</span>{freelancer.availableTimeSlotCodes.map((code) => labelOf(timeSlotMap, code)).join(', ') || '-'}</li>
-              <li><span className="fd-meta-icon">📍</span>{freelancer.activityRegionCodes.map((code) => labelOf(regionMap, code)).join(', ') || '-'}</li>
+              <li><span className="fd-meta-icon">📍</span>{freelancer.activityRegionCodes.filter((code) => code !== 'SEOUL_GANGNAM').map((code) => labelOf(regionMap, code)).join(', ') || '-'}</li>
               <li><span className="fd-meta-icon">📌</span>활동 {freelancer.activityCount ?? 0}건</li>
               <li><span className="fd-meta-icon">🩺</span>{freelancer.caregiverYn ? '요양보호사 자격 보유' : '일반 활동자'}</li>
             </ul>
