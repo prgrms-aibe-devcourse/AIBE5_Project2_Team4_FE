@@ -63,6 +63,14 @@ export function getMyReviews(params: { page?: number; size?: number } = {}): Pro
   return requestJson<PageResponse<ReviewSummaryResponse>>(`/api/v1/users/me/reviews${query ? `?${query}` : ''}`);
 }
 
+export function getMyReceivedReviews(params: { page?: number; size?: number } = {}): Promise<PageResponse<ReviewSummaryResponse>> {
+  const search = new URLSearchParams();
+  if (params.page != null) search.set('page', String(params.page));
+  if (params.size != null) search.set('size', String(params.size));
+  const query = search.toString();
+  return requestJson<PageResponse<ReviewSummaryResponse>>(`/api/v1/users/me/received-reviews${query ? `?${query}` : ''}`);
+}
+
 export function getMyReview(reviewId: number): Promise<ReviewDetailResponse> {
   return requestJson<ReviewDetailResponse>(`/api/v1/users/me/reviews/${reviewId}`);
 }

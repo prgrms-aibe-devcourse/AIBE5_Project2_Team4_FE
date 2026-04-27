@@ -2,6 +2,8 @@ import { useState } from 'react';
 import type { ReviewSummaryResponse, ReviewTagCodeResponse } from '../../api/reviews';
 import { formatDateTime } from '../../lib/referenceData';
 
+type ReviewListDirection = 'sent' | 'received';
+
 interface Props {
   reviews: ReviewSummaryResponse[];
   receivedReviews: ReviewSummaryResponse[];
@@ -20,8 +22,17 @@ interface Props {
   startEditReview: (review: ReviewSummaryResponse) => void;
 }
 
+function getCounterpartName(review: ReviewSummaryResponse, direction: ReviewListDirection) {
+  if (direction === 'received') {
+    return review.reviewerName || review.projectTitle;
+  }
+
+  return review.revieweeName || review.freelancerName || review.projectTitle;
+}
+
 function ReviewCard({
   review,
+  direction,
   editable,
   editingReviewId,
   editRating,
@@ -37,6 +48,7 @@ function ReviewCard({
   startEditReview,
 }: {
   review: ReviewSummaryResponse;
+  direction: ReviewListDirection;
   editable: boolean;
 } & Omit<Props, 'reviews' | 'receivedReviews' | 'canEdit'>) {
   return (
@@ -44,7 +56,7 @@ function ReviewCard({
       <div className="review-header">
         <div>
           <span className="review-service">
-            {review.revieweeName || review.freelancerName || review.projectTitle}
+            {getCounterpartName(review, direction)}
           </span>
           {review.reviewDirection && (
             <span className="review-direction-badge">
@@ -131,7 +143,7 @@ export default function ReviewsTab({
   startEditReview,
 }: Props) {
   const hasReceived = receivedReviews.length > 0;
-  const [direction, setDirection] = useState<'sent' | 'received'>('sent');
+  const [direction, setDirection] = useState<ReviewListDirection>('sent');
 
   const sharedCardProps = {
     editingReviewId,
@@ -180,6 +192,7 @@ export default function ReviewsTab({
             <ReviewCard
               key={review.reviewId}
               review={review}
+              direction={direction}
               editable={direction === 'sent' && canEdit}
               {...sharedCardProps}
             />

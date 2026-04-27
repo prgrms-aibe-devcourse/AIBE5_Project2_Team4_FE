@@ -49,7 +49,7 @@ import {
 import { getMyReports, type ReportSummaryResponse } from '../api/reports';
 import {
   deleteMyReview,
-  getFreelancerReviews,
+  getMyReceivedReviews,
   getMyReviews,
   getReviewTagCodes,
   updateMyReview,
@@ -287,24 +287,19 @@ export default function MyPage2() {
           intro: myPageResponse.user.intro ?? '',
         });
 
-        if (user.role === 'ROLE_USER') {
-          const [reviewPage, reportPage] = await Promise.all([
+        if (user.role === 'ROLE_USER' || user.role === 'ROLE_FREELANCER') {
+          const [reviewPage, receivedReviewPage, reportPage] = await Promise.all([
             getMyReviews({ page: 0, size: 100 }),
+            getMyReceivedReviews({ page: 0, size: 100 }),
             getMyReports({ page: 0, size: 100 }),
           ]);
 
           setReviews(reviewPage.content);
-          setReports(reportPage.content);
-        } else if (user.role === 'ROLE_FREELANCER') {
-          const [reviewPage, reportPage] = await Promise.all([
-            getMyReviews({ page: 0, size: 100 }),
-            getMyReports({ page: 0, size: 100 }),
-          ]);
-
-          setReviews(reviewPage.content);
+          setReceivedReviews(receivedReviewPage.content);
           setReports(reportPage.content);
         } else {
           setReviews([]);
+          setReceivedReviews([]);
           setReports([]);
         }
 
@@ -314,15 +309,13 @@ export default function MyPage2() {
             setFreelancerProfile(profile);
             setFreelancerForm(toFreelancerForm(profile));
 
-            const [files, myVerifications, receivedPage] = await Promise.all([
+            const [files, myVerifications] = await Promise.all([
               getMyFreelancerFiles(),
               getMyVerifications(),
-              getFreelancerReviews(profile.freelancerProfileId, { page: 0, size: 100 }),
             ]);
 
             setPortfolioFiles(files);
             setVerifications(myVerifications);
-            setReceivedReviews(receivedPage.content);
           } catch (caughtError) {
             const message = getErrorMessage(caughtError, '');
             if (!message.includes('404')) {
@@ -352,31 +345,21 @@ export default function MyPage2() {
     const myPageResponse = await getMyPage();
     setSummary(myPageResponse);
 
-    if (user?.role === 'ROLE_USER') {
-      const [reviewPage, reportPage] = await Promise.all([
+    if (user?.role === 'ROLE_USER' || user?.role === 'ROLE_FREELANCER') {
+      const [reviewPage, receivedReviewPage, reportPage] = await Promise.all([
         getMyReviews({ page: 0, size: 100 }),
+        getMyReceivedReviews({ page: 0, size: 100 }),
         getMyReports({ page: 0, size: 100 }),
       ]);
 
       setReviews(reviewPage.content);
+      setReceivedReviews(receivedReviewPage.content);
       setReports(reportPage.content);
-      return;
-    }
-
-    if (user?.role === 'ROLE_FREELANCER' && freelancerProfile) {
-      const [reviewPage, reportPage, receivedPage] = await Promise.all([
-        getMyReviews({ page: 0, size: 100 }),
-        getMyReports({ page: 0, size: 100 }),
-        getFreelancerReviews(freelancerProfile.freelancerProfileId, { page: 0, size: 100 }),
-      ]);
-
-      setReviews(reviewPage.content);
-      setReports(reportPage.content);
-      setReceivedReviews(receivedPage.content);
       return;
     }
 
     setReviews([]);
+    setReceivedReviews([]);
     setReports([]);
   }
 
