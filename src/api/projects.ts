@@ -6,6 +6,7 @@ export type ProjectStatus = 'REQUESTED' | 'ACCEPTED' | 'IN_PROGRESS' | 'COMPLETE
 export interface ProjectSummaryResponse {
   projectId: number;
   title: string;
+  ownerName?: string | null;
   projectTypeCode: string;
   serviceRegionCode: string;
   requestedStartAt: string;

@@ -149,6 +149,7 @@ function mergeProposalDetail(
 
   return {
     ...proposal,
+    ownerName: detail.ownerName,
     proposalStatus: detail.proposalStatus,
     projectStatus: detail.projectStatus,
     respondedAt: detail.respondedAt,
@@ -782,6 +783,7 @@ export default function ProjectPage3() {
                         <div className="project-card-meta">
                           <span>일정 {formatDateTime(project.requestedStartAt)}</span>
                           <span>지역 {labelOf(regionMap, project.serviceRegionCode)}</span>
+                          <span>등록자 {project.ownerName || '-'}</span>
                         </div>
                       </li>
                       ))}
@@ -865,6 +867,7 @@ export default function ProjectPage3() {
                 </div>
 
                 <ul className="modal-info">
+                  <li><span>등록자</span><span>{selectedProject.ownerName || '-'}</span></li>
                   <li><span>시작</span><span>{formatDateTime(selectedProject.requestedStartAt)}</span></li>
                   <li><span>종료</span><span>{formatDateTime(selectedProject.requestedEndAt)}</span></li>
                   <li><span>지역</span><span>{labelOf(regionMap, selectedProject.serviceRegionCode)}</span></li>
@@ -1007,6 +1010,7 @@ export default function ProjectPage3() {
                 </div>
 
                 <ul className="modal-info">
+                  <li><span>등록자</span><span>{selectedFreelancerProject.ownerName || '-'}</span></li>
                   <li><span>제안 상태</span><span>{PROPOSAL_STATUS_LABEL[selectedFreelancerProject.proposalStatus]}</span></li>
                   <li><span>프로젝트 상태</span><span>{PROJECT_STATUS_LABEL[selectedFreelancerProject.projectStatus]}</span></li>
                   <li><span>시작</span><span>{formatDateTime(selectedFreelancerProject.requestedStartAt)}</span></li>

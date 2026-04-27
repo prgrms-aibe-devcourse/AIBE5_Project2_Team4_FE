@@ -62,6 +62,7 @@ export default function ProposalTab({
               <h3 className="proposal-card-title">{proposal.projectTitle}</h3>
 
               <div className="proposal-card-info">
+                <span>등록자: {proposal.ownerName || '-'}</span>
                 <span>프로젝트 상태: {PROJECT_STATUS_LABEL[proposal.projectStatus]}</span>
                 <span>응답 시각: {formatDateTime(proposal.respondedAt)}</span>
               </div>

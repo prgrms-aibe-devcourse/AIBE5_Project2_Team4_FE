@@ -37,6 +37,7 @@ export interface ProposalSummaryResponse {
   projectId: number;
   projectTitle: string;
   ownerUserId: number;
+  ownerName?: string | null;
   proposalStatus: ProposalStatus;
   projectStatus: ProjectStatus;
   message?: string | null;
@@ -49,6 +50,7 @@ export interface ProposalDetailResponse {
   proposalId: number;
   projectId: number;
   ownerUserId: number;
+  ownerName?: string | null;
   projectTitle: string;
   projectTypeCode: string;
   serviceRegionCode: string;
