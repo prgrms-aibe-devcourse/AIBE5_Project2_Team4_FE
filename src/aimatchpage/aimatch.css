@@ -102,6 +102,63 @@
   background: rgba(155, 168, 130, 0.1);
 }
 
+.mp-region-selector {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.mp-chip-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.mp-chip {
+  background: var(--light-dark);
+  border: 1px solid var(--line-color);
+  border-radius: 20px;
+  padding: 0.45rem 1rem;
+  font-size: 0.82rem;
+  font-family: inherit;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.mp-chip:hover {
+  border-color: rgba(155, 168, 130, 0.5);
+  color: var(--text-light);
+}
+
+.mp-chip--selected {
+  border-color: var(--green-accent);
+  color: var(--green-accent);
+  background: rgba(155, 168, 130, 0.1);
+}
+
+.mp-chip--sub {
+  padding-inline: 0.85rem;
+}
+
+.mp-subregion-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding: 0.875rem 1rem;
+  background: var(--soft-overlay);
+  border: 1px solid var(--line-color);
+  border-radius: 12px;
+}
+
+.mp-subregion-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
 /* Region selector */
 .am-region-selector {
   display: flex;

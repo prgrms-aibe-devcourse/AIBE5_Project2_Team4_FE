@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import './aimatch.css';
 import AppHeader from '../components/AppHeader';
+import ActivityRegionSelector from '../mypage/components/ActivityRegionSelector';
 import { recommendFreelancers, type FreelancerRecommendationItemResponse } from '../api/recommendations';
 import { getProjectTypeCodes, getRegionCodes, getAvailableTimeSlotCodes, type CodeLookupResponse } from '../api/codes';
 import { getErrorMessage } from '../lib/errors';
@@ -129,7 +130,7 @@ export default function AiMatchPage() {
     void Promise.all([getProjectTypeCodes(), getRegionCodes(), getAvailableTimeSlotCodes()]).then(
       ([types, regions, slots]) => {
         setProjectTypeCodes(types);
-        setRegionCodes(regions.filter((r) => r.regionLevel === 1 || !r.parentRegionCode));
+        setRegionCodes(regions.filter((r) => r.code !== 'SEOUL_GANGNAM'));
         setTimeSlotCodes(slots);
         const merged = new Map([
           ...types.map((t) => [t.code, t.name] as [string, string]),
@@ -189,7 +190,6 @@ export default function AiMatchPage() {
   const selectedTypeLabel = selectedTypes.map((code) => labelOf(codeMap, code)).join(', ');
   const selectedRegionLabel = selectedRegions.map((code) => labelOf(codeMap, code)).join(', ');
   const selectedTimeSlotLabel = selectedTimeSlots.map((code) => labelOf(codeMap, code)).join(', ');
-  const regionLimitReached = selectedRegions.length >= MAX_REGION_SELECTION;
 
   return (
     <div className="am-page">
@@ -229,31 +229,14 @@ export default function AiMatchPage() {
                   <p style={{ marginBottom: '0.75rem', color: 'var(--text-secondary)', fontSize: '0.82rem' }}>
                     최대 {MAX_REGION_SELECTION}개까지 선택할 수 있습니다. 현재 {selectedRegions.length}개 선택됨.
                   </p>
-                  <div className="am-chip-group">
-                    {regionCodes.map((region) => (
-                      <button
-                        key={region.code}
-                        type="button"
-                        className={`am-chip${selectedRegions.includes(region.code) ? ' selected' : ''}`}
-                        onClick={() => {
-                          if (selectedRegions.includes(region.code)) {
-                            setSelectedRegions((prev) => toggleSelection(prev, region.code));
-                            return;
-                          }
-
-                          if (regionLimitReached) {
-                            setError(`활동 지역은 최대 ${MAX_REGION_SELECTION}개까지 선택할 수 있습니다.`);
-                            return;
-                          }
-
-                          setError('');
-                          setSelectedRegions((prev) => toggleSelection(prev, region.code));
-                        }}
-                      >
-                        {region.name}
-                      </button>
-                    ))}
-                  </div>
+                  <ActivityRegionSelector
+                    mode="chip"
+                    regionOptions={regionCodes}
+                    regionMap={codeMap}
+                    value={selectedRegions}
+                    onChange={setSelectedRegions}
+                    maxSelections={MAX_REGION_SELECTION}
+                  />
                 </section>
               )}
 
