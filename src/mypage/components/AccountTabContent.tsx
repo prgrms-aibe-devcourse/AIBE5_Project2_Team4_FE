@@ -21,7 +21,7 @@ interface AccountTabContentProps {
   applyForm: FreelancerFormState;
   setApplyForm: Dispatch<SetStateAction<FreelancerFormState>>;
   applyFiles: File[];
-  onApplyFileAdd(file: File | null): void;
+  onApplyFileAdd(files: File[]): void;
   onApplyFileRemove(index: number): void;
   onApplyAsFreelancer(): void;
 
@@ -210,8 +210,9 @@ export default function AccountTabContent({
                   <input
                     hidden
                     type="file"
+                    multiple
                     onChange={(e) => {
-                      onApplyFileAdd(e.target.files?.[0] ?? null);
+                      onApplyFileAdd(Array.from(e.target.files ?? []));
                       e.target.value = '';
                     }}
                   />

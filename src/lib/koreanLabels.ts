@@ -7,7 +7,7 @@ export type UserRoleCode = 'ROLE_USER' | 'ROLE_FREELANCER' | 'ROLE_ADMIN';
 
 const ROLE_LABELS: Record<UserRoleCode, string> = {
   ROLE_USER: '일반 사용자',
-  ROLE_FREELANCER: '프리랜서',
+  ROLE_FREELANCER: '메이트',
   ROLE_ADMIN: '관리자',
 };
 

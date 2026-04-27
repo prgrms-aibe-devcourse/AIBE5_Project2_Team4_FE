@@ -509,9 +509,9 @@ export default function MyPage2() {
     }
   }
 
-  function handleApplyFileAdd(file: File | null) {
-    if (!file) return;
-    setApplyFiles((prev) => [...prev, file]);
+  function handleApplyFileAdd(files: File[]) {
+    if (files.length === 0) return;
+    setApplyFiles((prev) => [...prev, ...files]);
   }
 
   function handleApplyFileRemove(index: number) {
@@ -540,16 +540,16 @@ export default function MyPage2() {
     }
   }
 
-  async function handlePortfolioUpload(file: File | null) {
-    if (!file) {
-      return;
-    }
+  async function handlePortfolioUpload(files: FileList | null) {
+    if (!files || files.length === 0) return;
 
     setSaving(true);
     setError('');
 
     try {
-      await uploadMyFreelancerFile(file);
+      for (const file of Array.from(files)) {
+        await uploadMyFreelancerFile(file);
+      }
       await refreshFreelancerWorkspace();
       setNotice('포트폴리오 파일을 업로드했습니다.');
     } catch (caughtError) {
@@ -643,16 +643,16 @@ export default function MyPage2() {
     }
   }
 
-  async function handleVerificationFileUpload(file: File | null) {
-    if (!file || !selectedVerificationId) {
-      return;
-    }
+  async function handleVerificationFileUpload(files: FileList | null) {
+    if (!files || files.length === 0 || !selectedVerificationId) return;
 
     setSaving(true);
     setError('');
 
     try {
-      await uploadVerificationFile(selectedVerificationId, file);
+      for (const file of Array.from(files)) {
+        await uploadVerificationFile(selectedVerificationId, file);
+      }
       await handleVerificationSelect(selectedVerificationId, true);
       await refreshFreelancerWorkspace();
       setNotice('인증 파일을 업로드했습니다.');
@@ -1151,7 +1151,7 @@ export default function MyPage2() {
                 <h2>포트폴리오</h2>
                 <label className="btn-edit">
                   파일 업로드
-                  <input hidden type="file" onChange={(event) => void handlePortfolioUpload(event.target.files?.[0] ?? null)} />
+                  <input hidden type="file" multiple onChange={(event) => void handlePortfolioUpload(event.target.files)} />
                 </label>
               </div>
               {portfolioFiles.length === 0 ? (
@@ -1220,7 +1220,7 @@ export default function MyPage2() {
                   <h2>인증 파일 관리</h2>
                   <label className="btn-edit">
                     파일 업로드
-                    <input hidden type="file" onChange={(event) => void handleVerificationFileUpload(event.target.files?.[0] ?? null)} />
+                    <input hidden type="file" multiple onChange={(event) => void handleVerificationFileUpload(event.target.files)} />
                   </label>
                 </div>
                 <ul className="account-info-list">
